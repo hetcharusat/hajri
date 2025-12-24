@@ -21,34 +21,24 @@ A React + Supabase admin panel for managing academic data and building timetable
 ### Planning
 - [Roadmap](/hajri-admin/ROADMAP) - Upcoming features and improvements
 
-## What This App Does
-
-- CRUD for departments, semesters, subjects, faculty, rooms, batches, students
 - **Offerings model (V2):** schedulable unit = subject + batch + faculty (+ default room)
 - **Timetable versioning (V2):** per batch draft/published/archived
 
 ## Typical Admin Flow
 
-1. Create departments/semesters/subjects/faculty/rooms/batches
-2. Create **course offerings** for each batch
-3. Build timetable in **Draft** using the editor
-4. Publish to make it live (previous published becomes archived)
+1. Ensure at least one department exists
+2. Use `/app/overview` + Tree Explorer to create branch → semester → class → batch
+3. With semester selected: create subjects (`/app/subjects`)
+4. Create faculty (`/app/faculty`) and rooms (`/app/rooms`)
+5. With class selected: create assignments (`/app/assignments`)
+6. With batch selected: build + publish timetable (`/app/timetable`)
 
-## Tech Stack
-
-### Frontend
-- **Framework:** React 18 with Vite
-- **UI Library:** Radix UI + Tailwind CSS
-- **State Management:** Zustand
 - **Data Fetching:** TanStack Query v4
 - **Routing:** React Router v6
 - **Icons:** Lucide React
 
 ### Backend
 - **Database:** Supabase (PostgreSQL)
-- **Authentication:** Supabase Auth (Google OAuth)
-- **Real-time:** Supabase Realtime (future)
-- **Storage:** Supabase Storage (future)
 
 ### Deployment
 - **Hosting:** Netlify (CDN + auto-deploy)

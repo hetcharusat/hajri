@@ -1,6 +1,6 @@
 # Hajri Project Master Documentation
 
-**Last Updated:** December 22, 2025
+**Last Updated:** December 25, 2025
 
 This directory contains comprehensive documentation for the Hajri project ecosystem, including architecture, workflows, schemas, and development roadmap.
 
@@ -25,10 +25,10 @@ masterdocs/
 ### 1. **Hajri Admin Portal** (`hajri-admin/`)
 A full-featured admin panel for managing academic timetables, departments, faculty, students, and course offerings. Built with React + Supabase.
 
-**Status:** Active development - V2 timetable editor implemented  
+**Status:** Active development - V3 structure tree + timetable editor  
 **Key Features:**
 - Google Calendar-like timetable editor
-- Batch-wise schedule management
+- Scope-aware schedule management (tree-selected batch)
 - Course offerings mapping (subject → batch → faculty)
 - Draft/Published versioning workflow
 - Complete CRUD for all academic entities
@@ -41,24 +41,25 @@ OCR-based system for processing and extracting data from academic documents.
 
 ## 🔑 Key Context for New Sessions
 
-### Current State (December 22, 2025)
-- ✅ Schema V2 implemented (offerings + versioned timetables)
-- ✅ Timetable V2 editor rebuilt (paint-to-grid workflow)
-- ✅ Offerings CRUD page complete
-- ⚠️ Dev server has build errors (needs fixing)
-- ⏳ Schema needs to be deployed to Supabase
-- ⏳ UX consistency pass pending
+### Current State (December 25, 2025)
+- ✅ Admin portal routes under `/app/*` (React Router)
+- ✅ Structure tree sidebar drives scope (department → branch → semester → class → batch)
+- ✅ Timetable editor is `TimetableNew.jsx`
+- ✅ Assignments/offerings page is `OfferingsNew.jsx`
+- ✅ Auto-naming implemented for classes/batches (`3CE1`, `3CE1-A`)
+- ⚠️ Ensure DB migration for `classes.name` / `batches.name` is applied (see schema docs)
 
 ### Immediate Next Steps
-1. **Fix build errors** - Run `npm run dev` in `hajri-admin` and resolve
-2. **Deploy CLEAN-SCHEMA.sql** - Run in Supabase SQL Editor
-3. **Test Offerings + Timetable** - Smoke test the V2 workflow
-4. **UX consistency** - Convert remaining pages to shadcn-style components
+1. **Deploy schema** - Run `hajri-admin/CLEAN-SCHEMA.sql` in Supabase SQL Editor
+2. **Apply migrations (if needed)** - Especially name columns for class/batch
+3. **Smoke test workflow** - Subjects → Assignments → Timetable → Publish
+4. **Keep docs current** - Use `masterdocs/hajri-admin/AI_CONTEXT.md` + `FILE_MAPPING.md`
 
 ### Critical Files
 - `hajri-admin/CLEAN-SCHEMA.sql` - Authoritative database schema
-- `hajri-admin/src/pages/Timetable.jsx` - V2 timetable editor
-- `hajri-admin/src/pages/Offerings.jsx` - Course offerings CRUD
+- `hajri-admin/src/pages/TimetableNew.jsx` - Timetable editor
+- `hajri-admin/src/pages/OfferingsNew.jsx` - Assignments (offerings)
+- `hajri-admin/src/App.tsx` - Routes
 - `hajri-admin/.env.local` - Supabase credentials (not in repo)
 
 ## 📖 How to Use This Documentation

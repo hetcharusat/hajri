@@ -38,9 +38,9 @@
 
 **Files Updated:**
 - `hajri-admin/CLEAN-SCHEMA.sql` - Complete authoritative schema
-- `hajri-admin/src/pages/Offerings.jsx` - New CRUD page for offerings
-- `hajri-admin/src/pages/Timetable.jsx` - Rebuilt V2 editor (paint workflow)
-- `hajri-admin/src/App.jsx` - Added offerings route
+- `hajri-admin/src/pages/OfferingsNew.jsx` - Assignments (offerings)
+- `hajri-admin/src/pages/TimetableNew.jsx` - Timetable editor
+- `hajri-admin/src/App.tsx` - `/app/*` routes
 - `hajri-admin/src/components/DashboardLayout.jsx` - Added offerings nav
 
 ---
@@ -137,7 +137,7 @@ This allows:
 
 ### Navigation
 - `DashboardLayout.jsx` sidebar with lucide icons
-- Routes: `/`, `/departments`, `/subjects`, `/timetable`, `/students`, `/semesters`, `/faculty`, `/rooms`, `/offerings`, `/settings`
+- Routes: `/login`, `/app/overview`, `/app/subjects`, `/app/faculty`, `/app/rooms`, `/app/period-templates`, `/app/assignments`, `/app/timetable`, `/settings`
 
 ---
 
@@ -219,9 +219,9 @@ CREATE POLICY "policy_name" ON table_name FOR operation TO authenticated
 - `hajri-admin/CLEAN-SCHEMA.sql` ✅ Complete V2 schema + auth + RLS
 
 ### Frontend Pages
-- `hajri-admin/src/pages/Timetable.jsx` ✅ V2 editor rebuilt
-- `hajri-admin/src/pages/Offerings.jsx` ✅ New CRUD page
-- `hajri-admin/src/App.jsx` ✅ Added offerings route
+- `hajri-admin/src/pages/TimetableNew.jsx` ✅ Current timetable editor
+- `hajri-admin/src/pages/OfferingsNew.jsx` ✅ Current assignments page
+- `hajri-admin/src/App.tsx` ✅ Current routing
 - `hajri-admin/src/components/DashboardLayout.jsx` ✅ Added offerings nav
 
 ### No Changes (Legacy, working)

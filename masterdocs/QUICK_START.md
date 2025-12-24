@@ -2,7 +2,7 @@
 
 **For:** Continuing development with a fresh AI chat session  
 **Context:** Hajri project (admin portal + OCR backend)  
-**Last Session:** December 22, 2025
+**Last Session:** December 25, 2025
 
 ---
 
@@ -12,13 +12,15 @@
 ```
 I'm taking over development of the Hajri project. Please read:
 - b:/hajri/masterdocs/CHAT_CONTEXT.md (full conversation history)
+- b:/hajri/masterdocs/hajri-admin/AI_CONTEXT.md (avoid wrong-file edits)
+- b:/hajri/masterdocs/hajri-admin/FILE_MAPPING.md (route/component map)
 - b:/hajri/masterdocs/hajri-admin/ROADMAP.md (immediate todos)
 
-Current blockers:
-1. Dev server failing (npm run dev exits code 1)
-2. Schema needs deployment (CLEAN-SCHEMA.sql → Supabase)
+Current priorities:
+1. Confirm schema deployed (CLEAN-SCHEMA.sql → Supabase)
+2. Confirm migrations applied (class/batch name columns)
 
-First action: Help me fix the dev server error.
+First action: Help me verify schema + migrations, then smoke test the UI.
 ```
 
 ---
@@ -27,21 +29,21 @@ First action: Help me fix the dev server error.
 
 ### Schema (Database)
 - **`b:/hajri/hajri-admin/CLEAN-SCHEMA.sql`**  
-  Authoritative database schema (V2 with offerings + versioned timetables)  
-  Status: Updated, needs deployment to Supabase
+  Authoritative database schema (V3 hierarchy + offerings + versioned timetables)  
+  Status: Must be deployed to Supabase for a fresh environment
+
+- **`b:/hajri/hajri-admin/migrations/add_name_columns_to_classes_and_batches.sql`**
+  Adds `classes.name` and `batches.name` used by auto-naming (`3CE1`, `3CE1-A`)
 
 ### Frontend (React)
-- **`b:/hajri/hajri-admin/src/pages/Timetable.jsx`**  
-  V2 timetable editor (paint-to-grid workflow)  
-  Status: Rebuilt cleanly, should compile
+- **`b:/hajri/hajri-admin/src/pages/TimetableNew.jsx`**  
+  Timetable editor (paint-to-grid workflow)
   
-- **`b:/hajri/hajri-admin/src/pages/Offerings.jsx`**  
-  Course offerings CRUD page  
-  Status: Complete, working
+- **`b:/hajri/hajri-admin/src/pages/OfferingsNew.jsx`**  
+  Assignments (course offerings) page
 
-- **`b:/hajri/hajri-admin/src/App.jsx`**  
-  Main routes + AdminGuard wrapper  
-  Status: Updated with offerings route
+- **`b:/hajri/hajri-admin/src/App.tsx`**  
+  Main routes + AdminGuard wrapper
 
 - **`b:/hajri/hajri-admin/.env.local`**  
   Supabase credentials (not in repo)  
@@ -57,22 +59,19 @@ First action: Help me fix the dev server error.
 ## 📋 Immediate TODOs (Priority Order)
 
 ### P0 - Blockers (Do First)
-1. **Fix Dev Server**  
-   - Run: `cd b:\hajri\hajri-admin; npm run dev`
-   - Capture full error output
-   - Fix import/build issues
-   - Target: Dev server starts successfully
-
-2. **Deploy Schema**  
+1. **Deploy Schema**  
    - Open Supabase SQL Editor
    - Run: `b:/hajri/hajri-admin/CLEAN-SCHEMA.sql`
-   - Verify all V2 tables created
-   - Verify seed data inserted
+  - Verify all core tables created
+
+2. **Apply Migration (if needed)**
+  - Run: `b:/hajri/hajri-admin/migrations/add_name_columns_to_classes_and_batches.sql`
+  - Verify `classes.name` and `batches.name` exist
 
 ### P1 - Testing (Do Second)
 3. **Smoke Test Workflow**  
    - Login as admin
-   - Create offering (Offerings page)
+  - Create assignment/offering (Assignments page)
    - Build timetable (Timetable page)
    - Publish draft
    - Verify published view
@@ -84,7 +83,7 @@ First action: Help me fix the dev server error.
      - Semesters.jsx
      - Faculty.jsx
      - Rooms.jsx
-   - Reference: Departments.jsx, Offerings.jsx
+  - Reference: newer `/app/*` pages (Subjects/Faculty/Rooms/Assignments/Timetable)
 
 5. **Missing Features**  
    - Room override in timetable
@@ -103,6 +102,8 @@ b:/hajri/
 │   ├── hajri-admin/        # Admin portal docs
 │   │   ├── ARCHITECTURE.md
 │   │   ├── SCHEMA_V2.md
+│   │   ├── AI_CONTEXT.md
+│   │   ├── FILE_MAPPING.md
 │   │   ├── WORKFLOWS.md
 │   │   └── ROADMAP.md
 │   └── hajri-ocr/          # OCR backend docs
@@ -112,9 +113,10 @@ b:/hajri/
 ├── hajri-admin/            # 🎨 React Admin Portal
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Timetable.jsx   ✅ V2 (rebuilt)
-│   │   │   ├── Offerings.jsx   ✅ New
-│   │   │   ├── Departments.jsx ✅ shadcn-style
+│   │   │   ├── TimetableNew.jsx    ✅ Timetable editor
+│   │   │   ├── OfferingsNew.jsx    ✅ Assignments
+│   │   │   ├── Subjects.jsx        ✅ Subjects
+│   │   │   ├── FacultyImproved.jsx ✅ Faculty (inline modal)
 │   │   │   ├── Students.jsx    ⚠️ Legacy Tailwind
 │   │   │   ├── Semesters.jsx   ⚠️ Legacy Tailwind
 │   │   │   ├── Faculty.jsx     ⚠️ Legacy Tailwind
@@ -122,11 +124,13 @@ b:/hajri/
 │   │   ├── components/
 │   │   │   ├── DashboardLayout.jsx
 │   │   │   ├── AdminGuard.jsx
+│   │   │   ├── AppShell.jsx
 │   │   │   └── ui/         # shadcn components
 │   │   └── lib/
 │   │       ├── supabase.js
 │   │       └── store.js
 │   ├── CLEAN-SCHEMA.sql    ⚠️ Needs deployment
+│   ├── migrations/         # DB migrations (run as needed)
 │   ├── .env.local          🔐 Secrets (not in repo)
 │   └── package.json
 │
@@ -171,15 +175,9 @@ Workflow:
 
 ## 🚨 Known Issues
 
-### Build Error
-- `npm run dev` failing (code 1)
-- Error output not captured yet
-- Likely import/module issue
-
-### Schema Mismatch
-- CLEAN-SCHEMA.sql updated locally
-- Not yet run in Supabase
-- Frontend expects V2 tables
+### Schema / Migration Drift
+- `CLEAN-SCHEMA.sql` is V3; ensure it is deployed.
+- Auto-naming uses `classes.name` and `batches.name` (apply migration if missing).
 
 ### UX Inconsistency
 - Some pages use shadcn-style (Departments, Offerings)
@@ -211,14 +209,14 @@ Location: `b:/hajri/hajri-ocr/.env`
 ### If Starting Fresh:
 1. Read `masterdocs/CHAT_CONTEXT.md` (20 min read)
 2. Skim `masterdocs/hajri-admin/ARCHITECTURE.md` (understand stack)
-3. Read `masterdocs/hajri-admin/SCHEMA_V2.md` (understand data model)
+3. Read `masterdocs/hajri-admin/SCHEMA_V2.md` (current schema reference; includes V3)
 4. Review `masterdocs/hajri-admin/ROADMAP.md` (know what's next)
 
 ### If Diving Into Code:
-1. Read `hajri-admin/src/pages/Departments.jsx` (simple CRUD example)
-2. Read `hajri-admin/src/pages/Offerings.jsx` (V2 CRUD with joins)
-3. Read `hajri-admin/src/pages/Timetable.jsx` (complex V2 editor)
-4. Trace a user action: Click Apply → Supabase upsert → RLS check
+1. Read `hajri-admin/src/App.tsx` (routing)
+2. Read `hajri-admin/src/components/AppShell.jsx` (tree sidebar + scope)
+3. Read `hajri-admin/src/pages/OfferingsNew.jsx` (assignments / offerings)
+4. Read `hajri-admin/src/pages/TimetableNew.jsx` (timetable editor)
 
 ### If Fixing Bugs:
 1. Identify file from error message
@@ -262,9 +260,10 @@ uvicorn main:app --reload
 ## 🎯 Success Criteria
 
 ### Session Goal: Get to Working State
-- [ ] Dev server runs without errors
-- [ ] Schema deployed to Supabase
-- [ ] Can login as admin
+- [ ] Dev server runs (`npm run dev`)
+- [ ] Schema deployed (`CLEAN-SCHEMA.sql`)
+- [ ] Migration applied if needed (`add_name_columns_to_classes_and_batches.sql`)
+- [ ] Can login as admin and create an Assignment then publish a Timetable
 - [ ] Can create offering
 - [ ] Can build timetable
 - [ ] Can publish timetable

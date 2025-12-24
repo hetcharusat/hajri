@@ -76,11 +76,11 @@
 - [x] Consolidated auth/admin setup into clean schema
 
 ### Frontend V2 Implementation
-- [x] Created `src/pages/Offerings.jsx` (CRUD page)
-- [x] Rebuilt `src/pages/Timetable.jsx` (paint-to-grid editor)
-- [x] Updated `src/App.jsx` (added offerings route)
+- [x] Created `src/pages/OfferingsNew.jsx` (assignments page)
+- [x] Created `src/pages/TimetableNew.jsx` (timetable editor)
+- [x] Updated `src/App.tsx` (added `/app/*` routes)
 - [x] Updated `src/components/DashboardLayout.jsx` (added offerings nav)
-- [x] Fixed Timetable.jsx corruption (nested imports/exports)
+- [x] Fixed Timetable.jsx corruption (nested imports/exports) (deprecated file)
 - [x] Verified no editor errors in key files
 
 ---
@@ -143,7 +143,7 @@
 - [ ] `Subjects.jsx` - Review and polish (already decent)
 - [ ] `Dashboard.jsx` - Add stats cards or welcome content
 
-**Reference:** Use `Departments.jsx` and `Offerings.jsx` as templates
+**Reference:** Use `Subjects.jsx` and `OfferingsNew.jsx` as templates
 
 **Estimated Time:** 3-4 hours
 
@@ -499,7 +499,7 @@ test: Add E2E test for timetable publish flow
 - Review SCHEMA_V2.md
 - Explore src/ structure
 - Read Departments.jsx (simple CRUD example)
-- Read Timetable.jsx (complex V2 example)
+- Read TimetableNew.jsx (current complex example)
 
 ### Day 3: First Task
 - Pick a small bug from roadmap

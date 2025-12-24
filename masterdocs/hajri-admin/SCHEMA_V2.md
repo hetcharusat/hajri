@@ -1,15 +1,15 @@
-# Database Schema V2 - Complete Reference
+# Database Schema - Current Reference
 
-**Last Updated:** December 22, 2025  
+**Last Updated:** December 25, 2025  
 **Schema File:** `hajri-admin/CLEAN-SCHEMA.sql`  
-**Purpose:** Authoritative clean-install schema for Hajri Admin Portal
+**Purpose:** Authoritative clean-install schema for Hajri Admin Portal (V3 hierarchy + offerings/timetable)
 
 ---
 
 ## At a Glance
 
 **What this doc is**
-- The V2 Postgres schema reference used by the Admin Portal.
+- The current Postgres schema reference used by the Admin Portal.
 
 **Where the truth lives**
 - `hajri-admin/CLEAN-SCHEMA.sql` (this doc describes it).
@@ -17,11 +17,17 @@
 **How to deploy**
 - Supabase → SQL Editor → run `hajri-admin/CLEAN-SCHEMA.sql` (destructive).
 
-**Key V2 tables**
+**Key app tables**
+- `departments` → `branches` → `semesters` → `classes` → `batches` (scope hierarchy)
 - `course_offerings`: schedulable teaching unit (subject+batch+faculty).
 - `timetable_versions`: per-batch draft/published/archived lifecycle.
 - `timetable_events`: grid cells referencing offerings.
 - `period_templates`: JSON timeslots (used by editor grid).
+
+**Required columns for current UI**
+- `classes.name` (auto-name like `3CE1`)
+- `batches.name` (auto-name like `3CE1-A`)
+- `faculty.abbr` (optional, used in dropdown display)
 
 **Key auth table**
 - `users`: linked to `auth.users`, controls admin access (`is_admin`).
@@ -36,45 +42,38 @@
 
 ### V1 (Legacy)
 - Basic entities: departments, subjects, faculty, rooms, batches, students
-- Simple timetable_entries (subject → faculty → room → batch → time)
+- Legacy timetable table: `timetable_entries` (removed in V2+)
 - No versioning, no offerings concept
 
-### V2 (Current)
-- **Offerings Model:** Subject + Batch + Faculty as schedulable unit
-- **Versioned Timetables:** Draft/Published/Archived per batch
-- **Period Templates:** JSON-based time slot definitions
-- **Academic Calendar:** JSON payload for future attendance
+### V2
+- Offerings model + timetable versioning.
+
+### V3 (Current)
+- **Hierarchy:** Department → Branch → Semester → Class → Batch
+- **Subjects** belong to a semester (`subjects.semester_id`).
+- **Assignments** are offerings for a batch (`course_offerings`).
 
 ---
 
 ## 📊 Entity Relationship Diagram (ERD)
 
 ```
-┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│ departments │◄──────│   batches   │──────►│  semesters  │
-└─────────────┘       └──────┬──────┘       └─────────────┘
-       │                     │                      │
-       │                     │                      │
-       ▼                     │                      ▼
-┌─────────────┐             │               ┌─────────────┐
-│   faculty   │             │               │   subjects  │
-└──────┬──────┘             │               └──────┬──────┘
-       │                     │                      │
-       │                     │                      │
-       │              ┌──────▼──────────────────────▼──────┐
-       │              │         course_offerings           │
-       └──────────────┤  (subject + batch + faculty)       │
-                      └──────────────┬────────────────────┬─┘
-                                     │                    │
-                      ┌──────────────▼──────┐             │
-                      │ timetable_versions  │             │
-                      │  (draft/published)  │             │
-                      └──────────────┬──────┘             │
-                                     │                    │
-                      ┌──────────────▼────────────────────▼─┐
-                      │        timetable_events            │
-                      │  (scheduled offering in slot)      │
-                      └────────────────────────────────────┘
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│ departments │──►│  branches    │──►│  semesters   │──►│   classes    │──►│   batches    │
+└─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘
+                     │
+                     ▼
+┌─────────────┐     ┌─────────────┐                        ┌───────────────┐
+│   faculty   │     │   subjects   │                        │ course_offerings│
+└─────────────┘     └─────────────┘                        └──────┬────────┘
+                     │
+                  ┌──────▼──────────┐
+                  │ timetable_versions│
+                  └──────┬──────────┘
+                    │
+                  ┌──────▼──────────┐
+                  │ timetable_events  │
+                  └──────────────────┘
 ```
 
 ---
@@ -108,76 +107,79 @@ CREATE TABLE users (
 ---
 
 #### 2. `departments`
-**Purpose:** Academic departments (CS, EE, ME, etc.)
+**Purpose:** Top-level grouping (often treated as building/location in V3 hierarchy)
 
 ```sql
 CREATE TABLE departments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,
-  name TEXT NOT NULL,
+  name TEXT UNIQUE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**Examples:**
-- `CS` - Computer Science
-- `EE` - Electrical Engineering
-- `ME` - Mechanical Engineering
-
 **Relationships:**
-- → `subjects.department_id`
-- → `faculty.department_id`
-- → `batches.department_id`
-- → `students.department_id`
+- → `branches.department_id`
+- → `rooms.department_id` (optional)
 
 ---
 
-#### 3. `semesters`
-**Purpose:** Academic semesters/terms
+#### 3. `branches`
+**Purpose:** Program/branch within a department (e.g., Computer Engineering)
+
+```sql
+CREATE TABLE branches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  abbreviation TEXT NOT NULL,
+  department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(name, department_id)
+);
+```
+
+**Relationships:**
+- → `semesters.branch_id`
+
+---
+
+#### 4. `semesters`
+**Purpose:** Semester instances per branch (1–8)
 
 ```sql
 CREATE TABLE semesters (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  year INTEGER NOT NULL,
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  is_active BOOLEAN DEFAULT false,
+  branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+  semester_number INTEGER NOT NULL CHECK (semester_number BETWEEN 1 AND 8),
+  start_date DATE,
+  end_date DATE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(name, year)
+  UNIQUE(branch_id, semester_number)
 );
 ```
 
-**Examples:**
-- `Semester 1, 2025` (Jan 15 - May 31)
-- `Semester 2, 2025` (Aug 1 - Dec 15)
-
-**Key Constraint:**
-- Unique(name, year) prevents duplicate semesters
-
 **Relationships:**
 - → `subjects.semester_id`
-- → `batches.semester_id`
-- → `students.semester_id`
+- → `classes.semester_id`
 
 ---
 
-#### 4. `subjects`
+#### 5. `subjects`
 **Purpose:** Courses/subjects taught
 
 ```sql
 CREATE TABLE subjects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE NOT NULL,
+  semester_id UUID NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
   name TEXT NOT NULL,
-  department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
-  semester_id UUID REFERENCES semesters(id) ON DELETE SET NULL,
   credits INTEGER DEFAULT 3,
   type TEXT DEFAULT 'LECTURE' CHECK (type IN ('LECTURE', 'LAB', 'TUTORIAL')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
+  ,UNIQUE(semester_id, code)
 );
 ```
 
@@ -187,12 +189,51 @@ CREATE TABLE subjects (
 - `TUTORIAL` - Discussion/problem-solving
 
 **Indexes:**
-- `idx_subjects_department` on `department_id`
-- `idx_subjects_semester` on `semester_id`
+- Unique: `(semester_id, code)`
 
 ---
 
-#### 5. `faculty`
+#### 6. `classes`
+**Purpose:** Multiple classes per semester (Class 1, Class 2, etc.)
+
+```sql
+CREATE TABLE classes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  semester_id UUID NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  class_number INTEGER NOT NULL,
+  name TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(semester_id, class_number)
+);
+```
+
+---
+
+#### 7. `batches`
+**Purpose:** Sections within a class (A, B, C, ...)
+
+```sql
+CREATE TABLE batches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  batch_letter TEXT NOT NULL CHECK (batch_letter ~ '^[A-Z]$'),
+  name TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(class_id, batch_letter)
+);
+```
+
+**Notes:**
+- `name` is used by the UI for display; it is auto-generated like `2CE1-A` when creating batches.
+
+**Relationships:**
+- → `course_offerings.batch_id`
+- → `timetable_versions.batch_id`
+- → `students.batch_id`
+
+---
+
+#### 8. `faculty`
 **Purpose:** Teaching staff
 
 ```sql
@@ -200,7 +241,7 @@ CREATE TABLE faculty (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   email TEXT UNIQUE,
-  department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
+  abbr TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -212,14 +253,14 @@ CREATE TABLE faculty (
 
 ---
 
-#### 6. `rooms`
+#### 9. `rooms`
 **Purpose:** Physical classrooms/labs
 
 ```sql
 CREATE TABLE rooms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   room_number TEXT UNIQUE NOT NULL,
-  building TEXT,
+  department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
   capacity INTEGER,
   type TEXT DEFAULT 'CLASSROOM' CHECK (type IN ('CLASSROOM', 'LAB', 'HALL')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -234,35 +275,7 @@ CREATE TABLE rooms (
 
 ---
 
-#### 7. `batches`
-**Purpose:** Student groups (section/division)
-
-```sql
-CREATE TABLE batches (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
-  semester_id UUID REFERENCES semesters(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(name, department_id, semester_id)
-);
-```
-
-**Examples:**
-- `CS-A` (Computer Science, Section A)
-- `EE-B` (Electrical Engineering, Section B)
-
-**Key Constraint:**
-- Unique(name, department, semester) prevents duplicate batches
-
-**Relationships:**
-- → `course_offerings.batch_id`
-- → `timetable_versions.batch_id`
-- → `students.batch_id`
-
----
-
-#### 8. `students`
+#### 10. `students`
 **Purpose:** Student records
 
 ```sql
@@ -271,8 +284,6 @@ CREATE TABLE students (
   roll_number TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   email TEXT UNIQUE,
-  department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
-  semester_id UUID REFERENCES semesters(id) ON DELETE SET NULL,
   batch_id UUID REFERENCES batches(id) ON DELETE SET NULL,
   enrollment_year INTEGER,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -475,32 +486,15 @@ CREATE TABLE academic_calendar (
 ### Legacy Tables (Compatibility)
 
 #### 14. `timetable_entries`
-**Purpose:** Legacy timetable format
+**Purpose:** Legacy timetable format (pre-versioning)
 
-```sql
-CREATE TABLE timetable_entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
-  faculty_id UUID REFERENCES faculty(id) ON DELETE SET NULL,
-  room_id UUID REFERENCES rooms(id) ON DELETE SET NULL,
-  batch_id UUID REFERENCES batches(id) ON DELETE CASCADE,
-  day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  version INTEGER DEFAULT 1,
-  is_published BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  CHECK (end_time > start_time)
-);
-```
+**Status:** Not part of the current clean schema and not used by the Admin Portal.
 
-**Status:** Kept for backward compatibility, not used by V2 UI
+**Current replacement:**
+- `timetable_versions` (draft/published lifecycle)
+- `timetable_events` (grid cells)
 
-**Indexes:**
-- `idx_timetable_subject` on `subject_id`
-- `idx_timetable_batch` on `batch_id`
-- `idx_timetable_day` on `day_of_week`
+If you have an old database that still contains `timetable_entries`, treat it as legacy data and migrate to the versioned model.
 
 ---
 
@@ -536,7 +530,7 @@ CREATE POLICY "Admins full access" ON <table_name> FOR ALL TO authenticated
 
 **Applied to:**
 - departments, semesters, subjects, faculty, rooms, batches
-- students, timetable_entries
+- students
 - course_offerings, timetable_versions, timetable_events
 - period_templates, academic_calendar
 
@@ -546,11 +540,7 @@ CREATE POLICY "Admins full access" ON <table_name> FOR ALL TO authenticated
 CREATE POLICY "Students read subjects" ON subjects FOR SELECT TO authenticated
   USING (true);
 
--- Published timetable (legacy)
-CREATE POLICY "Students read published timetable" ON timetable_entries FOR SELECT TO authenticated
-  USING (is_published = true);
-
--- Published timetable (V2)
+-- Published timetable (current)
 CREATE POLICY "Students read published timetable (V2)" ON timetable_events FOR SELECT TO authenticated
   USING (
     EXISTS (

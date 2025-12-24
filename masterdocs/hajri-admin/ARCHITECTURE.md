@@ -3,7 +3,7 @@
 **Project:** Hajri Admin Portal  
 **Purpose:** Full-featured academic timetable management system  
 **Stack:** React + Vite + Supabase + Tailwind  
-**Status:** V2 Implementation (December 2025)
+**Status:** V3 Hierarchy + Offerings/Timetable (December 2025)
 
 ---
 
@@ -17,20 +17,24 @@
 - Data model: /hajri-admin/SCHEMA_V2
 - How admins actually use it: /hajri-admin/WORKFLOWS
 
-**Core concepts (V2)**
+**Core concepts (current)**
+- **Hierarchy scope** via Tree Explorer: department → branch → semester → class → batch.
 - **Course offering** = subject + batch + faculty (+ default room).
 - **Timetable versioning** per batch: draft + published + archived.
 
 **Key source files**
 - `hajri-admin/CLEAN-SCHEMA.sql`
-- `hajri-admin/src/pages/Offerings.jsx`
-- `hajri-admin/src/pages/Timetable.jsx`
+- `hajri-admin/src/App.tsx`
+- `hajri-admin/src/components/AppShell.jsx`
+- `hajri-admin/src/pages/OfferingsNew.jsx`
+- `hajri-admin/src/pages/TimetableNew.jsx`
+- `hajri-admin/src/pages/FacultyImproved.jsx`
 - `hajri-admin/src/components/AdminGuard.jsx`
 
 **Common pitfalls**
+- Navigation tabs are scope-gated (select the right node in the Tree Explorer).
 - Timetable editing won’t work until offerings exist (events reference offerings).
 - “Access denied” usually means `users.is_admin=false`.
-- Dev server failing (current blocker) must be fixed before UI testing.
 
 ---
 
@@ -69,7 +73,8 @@ hajri-admin/
 │   │   │   ├── label.jsx
 │   │   │   └── table.jsx
 │   │   ├── AdminGuard.jsx      # Auth + admin check wrapper
-│   │   └── DashboardLayout.jsx # Sidebar + nav layout
+│   │   ├── AppShell.jsx         # /app layout + Tree Explorer + scope gating
+│   │   └── DashboardLayout.jsx  # Legacy layout (older pages)
 │   ├── lib/
 │   │   ├── supabase.js         # Supabase client instance
 │   │   ├── store.js            # Zustand state (auth + departments)
@@ -84,10 +89,10 @@ hajri-admin/
 │   │   ├── Semesters.jsx       # CRUD (legacy Tailwind)
 │   │   ├── Batches.jsx         # CRUD
 │   │   ├── Students.jsx        # CRUD (legacy Tailwind)
-│   │   ├── Offerings.jsx       # V2: Course offerings CRUD
-│   │   ├── Timetable.jsx       # V2: Paint-to-grid editor
+│   │   ├── OfferingsNew.jsx    # /app/assignments
+│   │   ├── TimetableNew.jsx    # /app/timetable (DND editor)
 │   │   └── Settings.jsx        # User management
-│   ├── App.jsx                 # Routes + AdminGuard
+│   ├── App.tsx                 # Routes + AdminGuard + /app/*
 │   └── main.jsx                # React entry point
 ├── CLEAN-SCHEMA.sql            # Complete DB schema (V2)
 ├── .env.local                  # Supabase credentials (not in repo)
@@ -276,7 +281,7 @@ className={cn(
 
 ### 1. Course Offerings Management
 
-**Page:** `src/pages/Offerings.jsx`
+**Page:** `src/pages/OfferingsNew.jsx` (route: `/app/assignments`)
 
 **Workflow:**
 1. Select batch (filtered by department)
@@ -300,7 +305,7 @@ const { error } = await supabase
 
 ### 2. Timetable V2 Editor
 
-**Page:** `src/pages/Timetable.jsx`
+**Page:** `src/pages/TimetableNew.jsx` (route: `/app/timetable`)
 
 **Architecture:**
 - **Paint Workflow:** Click offering → drag-select cells → apply
@@ -435,21 +440,35 @@ const canToggle = user.id !== currentUserId
 
 ## 🛣️ Routing Architecture
 
-**File:** `src/App.jsx`
+**File:** `src/App.tsx`
 
-```javascript
+The app uses an `AdminGuard` wrapper, then a nested `/app/*` layout via `AppShell`.
+
+```tsx
 <Routes>
   <Route path="/login" element={<Login />} />
-  <Route path="/" element={<AdminGuard><Dashboard /></AdminGuard>} />
-  <Route path="/departments" element={<AdminGuard><Departments /></AdminGuard>} />
-  <Route path="/subjects" element={<AdminGuard><Subjects /></AdminGuard>} />
-  <Route path="/timetable" element={<AdminGuard><Timetable /></AdminGuard>} />
-  <Route path="/students" element={<AdminGuard><Students /></AdminGuard>} />
-  <Route path="/semesters" element={<AdminGuard><Semesters /></AdminGuard>} />
-  <Route path="/faculty" element={<AdminGuard><Faculty /></AdminGuard>} />
-  <Route path="/rooms" element={<AdminGuard><Rooms /></AdminGuard>} />
-  <Route path="/offerings" element={<AdminGuard><Offerings /></AdminGuard>} />
-  <Route path="/settings" element={<AdminGuard><Settings /></AdminGuard>} />
+
+  <Route element={<AdminGuard><Outlet /></AdminGuard>}>
+    <Route index element={<Navigate to="/app/overview" replace />} />
+
+    <Route path="/app" element={<AppShell />}>
+      <Route index element={<Navigate to="/app/overview" replace />} />
+      <Route path="overview" element={<Overview />} />
+      <Route path="subjects" element={<Subjects />} />
+      <Route path="faculty" element={<FacultyImproved />} />
+      <Route path="rooms" element={<Rooms />} />
+      <Route path="period-templates" element={<PeriodTemplates />} />
+      <Route path="assignments" element={<OfferingsNew embedded={true} />} />
+      <Route path="timetable" element={<TimetableNew />} />
+    </Route>
+
+    {/* Back-compat */}
+    <Route path="/period-templates" element={<Navigate to="/app/period-templates" replace />} />
+
+    <Route path="/settings" element={<Settings />} />
+  </Route>
+
+  <Route path="*" element={<Navigate to="/app/overview" replace />} />
 </Routes>
 ```
 
