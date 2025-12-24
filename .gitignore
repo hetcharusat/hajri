@@ -12,9 +12,21 @@ __pycache__/
 dist/
 build/
 
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# VitePress
+.vitepress/cache/
+.vitepress/dist/
+
 # Environment
 .env
 .env.local
+.env.*
 
 # IDE
 .vscode/
