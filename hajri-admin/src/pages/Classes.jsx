@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { supabase } from '@/lib/supabase'
 import { Plus, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function Classes() {
   const [classes, setClasses] = useState([])
@@ -98,10 +99,27 @@ export default function Classes() {
     setError('')
 
     try {
+      // Generate auto-name: {semester_no}{branch_abbr}{class_no}
+      let autoName = null
+      try {
+        const { data: semester } = await supabase
+          .from('semesters')
+          .select('semester_number, branches(abbreviation)')
+          .eq('id', formData.semester_id)
+          .single()
+        
+        if (semester?.branches?.abbreviation) {
+          autoName = `${semester.semester_number}${semester.branches.abbreviation}${formData.class_number}`
+        }
+      } catch (err) {
+        console.warn('Auto-name generation failed:', err)
+      }
+
       const { error } = await supabase.from('classes').insert([
         {
           semester_id: formData.semester_id,
           class_number: parseInt(formData.class_number),
+          name: autoName || `Class ${formData.class_number}`,
         },
       ])
 
@@ -150,8 +168,8 @@ export default function Classes() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <div className="space-y-6">
+          <Card>
             <CardHeader>
               <CardTitle>Add Class</CardTitle>
               <CardDescription>Create a new class for a semester</CardDescription>
@@ -160,42 +178,48 @@ export default function Classes() {
               <form onSubmit={handleAdd} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="form-branch">Branch *</Label>
-                  <select
-                    id="form-branch"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={formData.branch_id}
-                    onChange={(e) => {
-                      const branchId = e.target.value
+                  <Select
+                    value={formData.branch_id || 'none'}
+                    onValueChange={(val) => {
+                      const branchId = val === 'none' ? '' : val
                       setFormData({ ...formData, branch_id: branchId, semester_id: '' })
                       loadSemestersForBranch(branchId)
                     }}
                     disabled={saving}
                   >
-                    <option value="">Select branch</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.abbreviation})
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="form-branch">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select branch</SelectItem>
+                      {branches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name} ({b.abbreviation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="form-semester">Semester *</Label>
-                  <select
-                    id="form-semester"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={formData.semester_id}
-                    onChange={(e) => setFormData({ ...formData, semester_id: e.target.value })}
+                  <Select
+                    value={formData.semester_id || 'none'}
+                    onValueChange={(val) => setFormData({ ...formData, semester_id: val === 'none' ? '' : val })}
                     disabled={saving || !formData.branch_id}
                   >
-                    <option value="">Select semester</option>
-                    {semesters.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        Semester {s.semester_number}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="form-semester">
+                      <SelectValue placeholder="Select semester" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select semester</SelectItem>
+                      {semesters.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          Semester {s.semester_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -235,25 +259,28 @@ export default function Classes() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader>
               <CardTitle>Classes List</CardTitle>
               <CardDescription>
                 <div className="flex items-center gap-3 mt-2">
                   <Label htmlFor="filter-branch" className="text-sm">Filter:</Label>
-                  <select
-                    id="filter-branch"
-                    className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-                    value={filters.branchId}
-                    onChange={(e) => setFilters({ ...filters, branchId: e.target.value })}
+                  <Select
+                    value={filters.branchId || 'all'}
+                    onValueChange={(val) => setFilters({ ...filters, branchId: val === 'all' ? '' : val })}
                   >
-                    <option value="">All branches</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="filter-branch" className="h-9 w-[220px]">
+                      <SelectValue placeholder="All branches" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All branches</SelectItem>
+                      {branches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardDescription>
             </CardHeader>

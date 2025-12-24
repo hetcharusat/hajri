@@ -14,13 +14,13 @@ const NODE_ICONS = {
 }
 
 const NODE_COLORS = {
-  department: 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 text-blue-600 border-blue-500/20',
-  branch: 'bg-gradient-to-br from-purple-500/10 to-purple-600/5 text-purple-600 border-purple-500/20',
-  semester: 'bg-gradient-to-br from-green-500/10 to-green-600/5 text-green-600 border-green-500/20',
-  class: 'bg-gradient-to-br from-orange-500/10 to-orange-600/5 text-orange-600 border-orange-500/20',
-  batch: 'bg-gradient-to-br from-pink-500/10 to-pink-600/5 text-pink-600 border-pink-500/20',
-  subject: 'bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 text-indigo-600 border-indigo-500/20',
-  student: 'bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 text-cyan-600 border-cyan-500/20',
+  department: 'bg-gradient-to-br from-blue-500/20 to-blue-600/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+  branch: 'bg-gradient-to-br from-purple-500/20 to-purple-600/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
+  semester: 'bg-gradient-to-br from-green-500/20 to-green-600/10 text-green-600 dark:text-green-400 border-green-500/30',
+  class: 'bg-gradient-to-br from-orange-500/20 to-orange-600/10 text-orange-600 dark:text-orange-400 border-orange-500/30',
+  batch: 'bg-gradient-to-br from-pink-500/20 to-pink-600/10 text-pink-600 dark:text-pink-400 border-pink-500/30',
+  subject: 'bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+  student: 'bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
 }
 
 export function EntityCard({ node, stats, onEdit, onDelete, onDuplicate }) {

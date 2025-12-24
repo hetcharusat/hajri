@@ -15,13 +15,13 @@ const NODE_ICONS = {
 }
 
 const NODE_COLORS = {
-  department: 'text-blue-600',
-  branch: 'text-purple-600',
-  semester: 'text-green-600',
-  class: 'text-orange-600',
-  batch: 'text-pink-600',
-  student: 'text-cyan-600',
-  subject: 'text-indigo-600',
+  department: 'text-blue-500',
+  branch: 'text-purple-500',
+  semester: 'text-green-500',
+  class: 'text-orange-500',
+  batch: 'text-pink-500',
+  student: 'text-cyan-500',
+  subject: 'text-indigo-500',
 }
 
 export function TreeNode({ node, level = 0, collapsed = false }) {
@@ -87,12 +87,30 @@ export function TreeNode({ node, level = 0, collapsed = false }) {
           break
 
         case 'semester':
-          const [classesRes, subjectsRes] = await Promise.all([
-            supabase
+          // Try to query classes with name column first
+          let classesData = []
+          try {
+            const classesRes = await supabase
+              .from('classes')
+              .select('id, class_number, name')
+              .eq('semester_id', node.id)
+              .order('class_number')
+            
+            if (classesRes.error) throw classesRes.error
+            classesData = classesRes.data || []
+          } catch (err) {
+            // If name column doesn't exist, query without it
+            const classesRes = await supabase
               .from('classes')
               .select('id, class_number')
               .eq('semester_id', node.id)
-              .order('class_number'),
+              .order('class_number')
+            
+            if (classesRes.error) throw classesRes.error
+            classesData = classesRes.data || []
+          }
+          
+          const [subjectsRes] = await Promise.all([
             supabase
               .from('subjects')
               .select('id, code, name, credits, type')
@@ -100,13 +118,13 @@ export function TreeNode({ node, level = 0, collapsed = false }) {
               .order('code')
           ])
           
-          const classData = classesRes.data?.map((c) => ({
+          const classData = classesData.map((c) => ({
             id: c.id,
             type: 'class',
-            name: `Class ${c.class_number}`,
+            name: c.name || `Class ${c.class_number}`,
             meta: null,
             parentPath: [...node.parentPath, node],
-          })) || []
+          }))
           
           const subjectData = subjectsRes.data?.map((s) => ({
             id: s.id,
@@ -124,18 +142,36 @@ export function TreeNode({ node, level = 0, collapsed = false }) {
           break
 
         case 'class':
-          const { data: batches } = await supabase
-            .from('batches')
-            .select('id, batch_letter')
-            .eq('class_id', node.id)
-            .order('batch_letter')
-          data = batches?.map((b) => ({
+          // Try to query batches with name column first
+          let batchesData = []
+          try {
+            const batchesRes = await supabase
+              .from('batches')
+              .select('id, batch_letter, name')
+              .eq('class_id', node.id)
+              .order('batch_letter')
+            
+            if (batchesRes.error) throw batchesRes.error
+            batchesData = batchesRes.data || []
+          } catch (err) {
+            // If name column doesn't exist, query without it
+            const batchesRes = await supabase
+              .from('batches')
+              .select('id, batch_letter')
+              .eq('class_id', node.id)
+              .order('batch_letter')
+            
+            if (batchesRes.error) throw batchesRes.error
+            batchesData = batchesRes.data || []
+          }
+          
+          data = batchesData.map((b) => ({
             id: b.id,
             type: 'batch',
-            name: `Batch ${b.batch_letter}`,
+            name: b.name || `Batch ${b.batch_letter}`,
             meta: null,
             parentPath: [...node.parentPath, node],
-          })) || []
+          }))
           break
 
       }

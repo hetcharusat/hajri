@@ -214,7 +214,7 @@ export default function Settings() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="h-4 w-4" />
+                            <Calendar className="h-4 w-4 text-foreground" />
                             {new Date(user.created_at).toLocaleDateString()}
                           </div>
                         </TableCell>

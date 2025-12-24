@@ -166,9 +166,9 @@ export default function Subjects() {
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-5">
+        <div className="space-y-6">
           {/* Add Subject Form */}
-          <Card className="md:col-span-2">
+          <Card className="border-2">
             <CardHeader>
               <CardTitle>Add New Subject</CardTitle>
               <CardDescription>Enter subject details</CardDescription>
@@ -245,7 +245,7 @@ export default function Subjects() {
           </Card>
 
           {/* Subjects Table */}
-          <Card className="md:col-span-3">
+          <Card className="border-2">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BookOpen className="mr-2 h-5 w-5" />

@@ -253,7 +253,7 @@ export function PeriodTemplatesTab() {
           <CardContent>
             {!activeTemplate ? (
               <div className="text-center py-12 text-muted-foreground">
-                <Clock className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-30" />
                 <p>Select a template from the left to edit its periods</p>
               </div>
             ) : periods.length === 0 ? (

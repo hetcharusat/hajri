@@ -218,29 +218,29 @@ export default function StructureExplorer() {
                 Overview
               </TabsTrigger>
               <TabsTrigger value="subjects" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <BookOpen className="h-4 w-4 mr-2" />
+                <BookOpen className="h-4 w-4 mr-2 text-foreground" />
                 Subjects
               </TabsTrigger>
               <TabsTrigger value="offerings" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Layers className="h-4 w-4 mr-2" />
+                <Layers className="h-4 w-4 mr-2 text-foreground" />
                 Offerings
               </TabsTrigger>
               {selectedNode?.type === 'batch' && (
                 <TabsTrigger value="timetable" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Calendar className="h-4 w-4 mr-2" />
+                  <Calendar className="h-4 w-4 mr-2 text-foreground" />
                   Timetable
                 </TabsTrigger>
               )}
               <TabsTrigger value="faculty" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <GraduationCap className="h-4 w-4 mr-2" />
+                <GraduationCap className="h-4 w-4 mr-2 text-foreground" />
                 Faculty
               </TabsTrigger>
               <TabsTrigger value="rooms" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <MapPin className="h-4 w-4 mr-2" />
+                <MapPin className="h-4 w-4 mr-2 text-foreground" />
                 Rooms
               </TabsTrigger>
               <TabsTrigger value="periods" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Clock className="h-4 w-4 mr-2" />
+                <Clock className="h-4 w-4 mr-2 text-foreground" />
                 Periods
               </TabsTrigger>
             </TabsList>

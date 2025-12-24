@@ -267,7 +267,8 @@ export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
       loading={loading}
     >
       {error && (
-        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive mb-4">
+        <div className="p-4 rounded-lg bg-destructive/10 border-l-4 border-destructive text-sm text-destructive mb-4 shadow-sm">
+          <div className="font-semibold mb-1">Error</div>
           {error}
         </div>
       )}
@@ -313,7 +314,7 @@ export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
       {schema.supportsDepartmentId && (
         <FormField label="Department (Optional)">
           <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="flex h-11 w-full rounded-lg border-2 border-input bg-background px-4 py-2.5 text-sm font-medium shadow-sm transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary focus-visible:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             value={formData.department_id || ''}
             onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
             disabled={lockedToDepartment}
@@ -328,18 +329,21 @@ export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
 
       {mode === 'add' && getSemesterIdFromContext(node) && semesterSubjects.length > 0 && (
         <FormField label="Link to Subjects (optional)">
-          <div className="text-xs text-muted-foreground mb-2">
-            Creates/updates course offerings for all batches in this semester.
+          <div className="text-xs text-muted-foreground mb-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+            💡 Creates/updates course offerings for all batches in this semester.
           </div>
-          <div className="rounded-md border border-input bg-background p-2 max-h-[200px] overflow-auto">
-            <div className="space-y-2">
+          <div className="rounded-lg border-2 border-input bg-gradient-to-br from-background to-muted/20 p-3 max-h-[240px] overflow-auto shadow-inner">
+            <div className="space-y-1.5">
               {semesterSubjects.map((s) => {
                 const checked = selectedSubjectIds.includes(s.id)
                 return (
-                  <label key={s.id} className="flex items-start gap-3 px-2 py-2 rounded-md hover:bg-muted/40 cursor-pointer">
+                  <label 
+                    key={s.id} 
+                    className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-primary/10 cursor-pointer transition-all duration-150 border border-transparent hover:border-primary/30 hover:shadow-sm"
+                  >
                     <input
                       type="checkbox"
-                      className="mt-0.5 h-4 w-4"
+                      className="mt-0.5 h-4 w-4 rounded border-2 border-primary/50 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all cursor-pointer"
                       checked={checked}
                       onChange={(e) => {
                         const next = e.target.checked
@@ -348,10 +352,10 @@ export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
                         setSelectedSubjectIds(next)
                       }}
                     />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-muted-foreground">{s.code}</span>
-                        <span className="text-sm font-medium truncate">{s.name}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">{s.code}</span>
+                        <span className="text-sm font-medium text-foreground truncate">{s.name}</span>
                       </div>
                     </div>
                   </label>

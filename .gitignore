@@ -48,3 +48,7 @@ Thumbs.db
 temp/
 tmp/
 *.tmp
+
+# SQL Queries (local development/sensitive)
+sql-queries/
+**/sql-queries/

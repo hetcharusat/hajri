@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/lib/supabase'
 import { useScopeStore } from '@/lib/store'
 import { Plus, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function Branches() {
   const { departmentId: scopeDepartmentId } = useScopeStore()
@@ -129,8 +130,8 @@ export default function Branches() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <div className="space-y-6">
+          <Card>
             <CardHeader>
               <CardTitle>Add Branch</CardTitle>
               <CardDescription>Create a new program/branch</CardDescription>
@@ -165,20 +166,23 @@ export default function Branches() {
 
                 <div className="space-y-2">
                   <Label htmlFor="department">Department (Building)</Label>
-                  <select
-                    id="department"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={formData.department_id}
-                    onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                  <Select
+                    value={formData.department_id || 'none'}
+                    onValueChange={(val) => setFormData({ ...formData, department_id: val === 'none' ? '' : val })}
                     disabled={saving}
                   >
-                    <option value="">None</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="department">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground">
                     Optional: link to a building/location
                   </p>
@@ -205,7 +209,7 @@ export default function Branches() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader>
               <CardTitle>Branches List</CardTitle>
               <CardDescription>

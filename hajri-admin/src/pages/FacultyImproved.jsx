@@ -227,14 +227,14 @@ export default function FacultyImproved() {
 
       {/* Add/Edit Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-gradient-to-br from-purple-900/70 via-blue-900/70 to-indigo-900/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto border-2 border-primary shadow-2xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
             <form onSubmit={handleSubmit}>
               {/* Form Header */}
-              <div className="p-6 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="p-6 border-b-2 border-primary/30 bg-gradient-to-r from-primary via-blue-600 to-indigo-600">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold flex items-center gap-3">
-                    <GraduationCap className="text-blue-600" size={28} />
+                  <h2 className="text-2xl font-bold flex items-center gap-3 text-white drop-shadow-lg">
+                    <GraduationCap className="text-white" size={28} />
                     {formData.id ? 'Edit Faculty' : 'Add New Faculty'}
                   </h2>
                   <Button
@@ -242,6 +242,7 @@ export default function FacultyImproved() {
                     variant="outline"
                     size="sm"
                     onClick={() => setShowForm(false)}
+                    className="bg-white/20 border-white/50 text-white hover:bg-white/30 hover:text-white"
                   >
                     <X size={18} />
                   </Button>
@@ -249,11 +250,12 @@ export default function FacultyImproved() {
               </div>
 
               {/* Form Body */}
-              <div className="p-6 space-y-6">
+              <div className="p-6 space-y-6 bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
                 {/* Name */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Users size={16} />
+                  <label className="block text-sm font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                    <span className="w-1.5 h-5 bg-gradient-to-b from-primary to-blue-600 rounded-full"></span>
+                    <Users size={16} className="text-primary" />
                     Full Name *
                   </label>
                   <Input
@@ -268,8 +270,9 @@ export default function FacultyImproved() {
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2 flex items-center gap-2">
-                    <Mail size={16} />
+                  <label className="block text-sm font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                    <span className="w-1.5 h-5 bg-gradient-to-b from-primary to-blue-600 rounded-full"></span>
+                    <Mail size={16} className="text-primary" />
                     Email Address
                   </label>
                   <Input
@@ -283,7 +286,8 @@ export default function FacultyImproved() {
 
                 {/* Abbreviation */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2">
+                  <label className="block text-sm font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                    <span className="w-1.5 h-5 bg-gradient-to-b from-primary to-blue-600 rounded-full"></span>
                     Abbreviation / Short Code
                   </label>
                   <Input
@@ -294,30 +298,31 @@ export default function FacultyImproved() {
                     maxLength={10}
                     className="text-base"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-2">
                     Used in timetables and reports for quick identification
                   </p>
                 </div>
 
                 {/* Info Box */}
-                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    <strong>Note:</strong> After creating a faculty member, assign them to courses 
-                    in the <strong>Assignments</strong> tab.
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/40 border-l-4 border-amber-500 rounded-lg p-4 shadow-sm">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                    <strong className="text-amber-900 dark:text-amber-100">💡 Note:</strong> After creating a faculty member, assign them to courses 
+                    in the <strong className="text-primary">Assignments</strong> tab.
                   </p>
                 </div>
               </div>
 
               {/* Form Footer */}
-              <div className="p-6 border-t bg-gray-50 flex gap-3 justify-end">
+              <div className="p-6 border-t-2 border-primary/20 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 flex gap-3 justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowForm(false)}
+                  className="border-2 border-slate-300 hover:border-primary hover:bg-slate-100"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                <Button type="submit" className="bg-gradient-to-r from-primary via-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg hover:shadow-xl transition-all">
                   <Check className="mr-2" size={18} />
                   {formData.id ? 'Update Faculty' : 'Create Faculty'}
                 </Button>

@@ -119,14 +119,31 @@ export function ScopeBar() {
 
       try {
         setLoading(true)
-        const { data, error } = await supabase
-          .from('classes')
-          .select('id, class_number, semester_id')
-          .eq('semester_id', semesterId)
-          .order('class_number', { ascending: true })
-
-        if (error) throw error
-        if (!cancelled) setClasses(data || [])
+        
+        // Try to query with name column first
+        let data = []
+        try {
+          const result = await supabase
+            .from('classes')
+            .select('id, class_number, semester_id, name')
+            .eq('semester_id', semesterId)
+            .order('class_number', { ascending: true })
+          
+          if (result.error) throw result.error
+          data = result.data || []
+        } catch (err) {
+          // If name column doesn't exist, query without it
+          const result = await supabase
+            .from('classes')
+            .select('id, class_number, semester_id')
+            .eq('semester_id', semesterId)
+            .order('class_number', { ascending: true })
+          
+          if (result.error) throw result.error
+          data = result.data || []
+        }
+        
+        if (!cancelled) setClasses(data)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -150,14 +167,31 @@ export function ScopeBar() {
 
       try {
         setLoading(true)
-        const { data, error } = await supabase
-          .from('batches')
-          .select('id, batch_letter, class_id')
-          .eq('class_id', classId)
-          .order('batch_letter', { ascending: true })
-
-        if (error) throw error
-        if (!cancelled) setBatches(data || [])
+        
+        // Try to query with name column first
+        let data = []
+        try {
+          const result = await supabase
+            .from('batches')
+            .select('id, batch_letter, class_id, name')
+            .eq('class_id', classId)
+            .order('batch_letter', { ascending: true })
+          
+          if (result.error) throw result.error
+          data = result.data || []
+        } catch (err) {
+          // If name column doesn't exist, query without it
+          const result = await supabase
+            .from('batches')
+            .select('id, batch_letter, class_id')
+            .eq('class_id', classId)
+            .order('batch_letter', { ascending: true })
+          
+          if (result.error) throw result.error
+          data = result.data || []
+        }
+        
+        if (!cancelled) setBatches(data)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -194,8 +228,8 @@ export function ScopeBar() {
     selectedDepartment?.name,
     selectedBranch ? `${selectedBranch.abbreviation || ''}${selectedBranch.abbreviation ? ' - ' : ''}${selectedBranch.name}` : null,
     selectedSemester ? `Semester ${selectedSemester.semester_number}` : null,
-    selectedClass ? `Class ${selectedClass.class_number}` : null,
-    selectedBatch ? `Batch ${selectedBatch.batch_letter}` : null,
+    selectedClass ? (selectedClass.name || `Class ${selectedClass.class_number}`) : null,
+    selectedBatch ? (selectedBatch.name || `Batch ${selectedBatch.batch_letter}`) : null,
   ].filter(Boolean)
 
   return (
@@ -248,7 +282,7 @@ export function ScopeBar() {
           placeholder={semesterId ? 'Search class...' : 'Select semester first'}
           value={classId}
           onValueChange={setClassId}
-          options={classes.map((c) => ({ value: c.id, label: `Class ${c.class_number}` }))}
+          options={classes.map((c) => ({ value: c.id, label: c.name || `Class ${c.class_number}` }))}
           disabled={loading || !semesterId}
         />
 
@@ -257,7 +291,7 @@ export function ScopeBar() {
           placeholder={classId ? 'Search batch...' : 'Select class first'}
           value={batchId}
           onValueChange={setBatchId}
-          options={batches.map((b) => ({ value: b.id, label: `Batch ${b.batch_letter}` }))}
+          options={batches.map((b) => ({ value: b.id, label: b.name || `Batch ${b.batch_letter}` }))}
           disabled={loading || !classId}
         />
       </div>

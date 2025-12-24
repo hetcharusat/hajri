@@ -3,6 +3,38 @@ import { SlidePanel, FormField } from '../SlidePanel/SlidePanel'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
 
+// Helper to generate auto-name on save
+const generateAutoName = async (type, data) => {
+  try {
+    if (type === 'class' && data.semester_id && data.class_number) {
+      const { data: semester } = await supabase
+        .from('semesters')
+        .select('semester_number, branches(abbreviation)')
+        .eq('id', data.semester_id)
+        .single()
+      
+      if (semester?.branches?.abbreviation) {
+        return `${semester.semester_number}${semester.branches.abbreviation}${data.class_number}`
+      }
+    }
+    
+    if (type === 'batch' && data.class_id && data.batch_letter) {
+      const { data: classInfo } = await supabase
+        .from('classes')
+        .select('class_number, semesters(semester_number, branches(abbreviation))')
+        .eq('id', data.class_id)
+        .single()
+      
+      if (classInfo?.semesters?.branches?.abbreviation) {
+        return `${classInfo.semesters.semester_number}${classInfo.semesters.branches.abbreviation}${classInfo.class_number}-${data.batch_letter.toUpperCase()}`
+      }
+    }
+  } catch (err) {
+    console.error('Auto-name generation failed:', err)
+  }
+  return null
+}
+
 export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -128,17 +160,21 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
         break
 
       case 'class':
+        const autoClassName = await generateAutoName('class', formData)
         data = {
           semester_id: formData.semester_id,
           class_number: parseInt(formData.class_number),
+          name: autoClassName || `Class ${formData.class_number}`,
         }
         await supabase.from('classes').insert([data]).throwOnError()
         break
 
       case 'batch':
+        const autoBatchName = await generateAutoName('batch', formData)
         data = {
           class_id: formData.class_id,
           batch_letter: formData.batch_letter.trim().toUpperCase(),
+          name: autoBatchName || `Batch ${formData.batch_letter.toUpperCase()}`,
         }
         await supabase.from('batches').insert([data]).throwOnError()
         break
@@ -169,14 +205,22 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
         }
         break
 
-      case 'class':
-        table = 'classes'
-        data = { class_number: parseInt(formData.class_number) }
+      caconst updatedClassName = await generateAutoName('class', { ...node, ...formData, semester_id: node.semester_id })
+        data = { 
+          class_number: parseInt(formData.class_number),
+          ...(updatedClassName && { name: updatedClassName })
+        }
         break
 
       case 'batch':
         table = 'batches'
-        data = { batch_letter: formData.batch_letter.trim().toUpperCase() }
+        const updatedBatchName = await generateAutoName('batch', { ...node, batch_letter: formData.batch_letter, class_id: node.class_id })
+        data = { 
+          batch_letter: formData.batch_letter.trim().toUpperCase(),
+          ...(updatedBatchName && { name: updatedBatch
+          batch_letter: formData.batch_letter.trim().toUpperCase(),
+          ...(previewName && { name: previewName })
+        }
         break
     }
 
@@ -222,7 +266,7 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
             {mode === 'add' && dependencies.departments && (
               <FormField label="Department (Optional)">
                 <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex h-11 w-full rounded-lg border-2 border-input bg-background px-4 py-2.5 text-sm font-medium shadow-sm transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary focus-visible:shadow-md"
                   value={formData.department_id || ''}
                   onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
                 >
@@ -241,7 +285,7 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
           <>
             <FormField label="Semester Number" required>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                className="flex h-11 w-full rounded-lg border-2 border-input bg-background px-4 py-2.5 text-sm font-medium shadow-sm transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary focus-visible:shadow-md"
                 value={formData.semester_number || ''}
                 onChange={(e) => setFormData({ ...formData, semester_number: e.target.value })}
                 required
@@ -271,9 +315,7 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
           </>
         )
 
-      case 'class':
-        return (
-          <FormField label="Class Number" required>
+      case FormField label="Class Number" required>
             <Input
               type="number"
               min="1"
@@ -281,37 +323,47 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
               value={formData.class_number || ''}
               onChange={(e) => setFormData({ ...formData, class_number: e.target.value })}
               required
+              className="text-base"
             />
-          </FormField>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Auto-naming: <span className="font-mono font-semibold">{'{'}semester{'}{'}branch{'}{'}number{'}'}</span> (e.g., 3CE1)
+            </div>
+          </FormField  </div>
+            )}
+          </>
         )
 
       case 'batch':
         return (
-          <FormField label="Batch Letter" required>
+          <>
+            <FormField label="Batch Letter" required>
+              <Input
+                placeholder="e.g. A, B, C"
+                value={formData.batch_letter || ''}
+                onChange={(e) => setFormData({ ...formData, batch_letter: e.target.value })}
+                maxLength={1}
+                required
+              />
+            </FormField>
+            
+            {previewName && (
+              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-sm font-semibold text-primary">📝 Auto-Generated Name:</div>
+                  <div className="text-lg font-bold font-mono text-foreground">{previewName}</div>
+           FormField label="Batch Letter" required>
             <Input
               placeholder="e.g. A, B, C"
               value={formData.batch_letter || ''}
               onChange={(e) => setFormData({ ...formData, batch_letter: e.target.value })}
               maxLength={1}
               required
+              className="text-base uppercase"
             />
-          </FormField>
-        )
-
-      default:
-        return null
-    }
-  }
-
-  const getTitle = () => {
-    if (mode === 'edit') {
-      return `Edit ${node?.type || 'Item'}`
-    }
-    const childType = getChildType(node?.type)
-    return `Add ${childType.charAt(0).toUpperCase() + childType.slice(1)}`
-  }
-
-  return (
+            <div className="mt-2 text-xs text-muted-foreground">
+              Auto-naming: <span className="font-mono font-semibold">{'{'}semester{'}{'}branch{'}{'}class{'}'}-{'{'}letter{'}'}</span> (e.g., 3CE1-A)
+            </div>
+          </FormField
     <SlidePanel
       open={open}
       onClose={onClose}
@@ -324,7 +376,20 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
           {error}
         </div>
       )}
+      
+      {/* Debug indicator - remove after confirming it works */}
+      {import.meta.env.DEV && namingContext && (
+        <div className="mb-3 p-2 rounded text-xs bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400">
+          ✓ Auto-naming ready: {namingContext.type === 'class' ? `${namingContext.semesterNumber}${namingContext.branchAbbr}[N]` : `${namingContext.semesterNumber}${namingContext.branchAbbr}${namingContext.classNumber}-[X]`}
+        </div>
+      )}
+      
       {renderFields()}
     </SlidePanel>
   )
 }
+4 rounded-lg bg-destructive/10 border-l-4 border-destructive text-sm text-destructive mb-4 shadow-sm">
+          <div className="font-semibold mb-1">Error</div>
+          {error}
+        </div>
+      )}

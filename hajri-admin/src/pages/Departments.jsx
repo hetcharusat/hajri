@@ -85,8 +85,8 @@ export default function Departments() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <div className="space-y-6">
+          <Card>
             <CardHeader>
               <CardTitle>Add Department</CardTitle>
               <CardDescription>Add a new building location</CardDescription>
@@ -120,7 +120,7 @@ export default function Departments() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader>
               <CardTitle>Building Locations</CardTitle>
               <CardDescription>

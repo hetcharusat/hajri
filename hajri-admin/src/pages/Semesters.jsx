@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { supabase } from '@/lib/supabase'
 import { Plus, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function Semesters() {
   const [semesters, setSemesters] = useState([])
@@ -110,8 +111,8 @@ export default function Semesters() {
           </div>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <div className="space-y-6">
+          <Card>
             <CardHeader>
               <CardTitle>Add Semester</CardTitle>
               <CardDescription>Create a semester for a branch</CardDescription>
@@ -120,38 +121,44 @@ export default function Semesters() {
               <form onSubmit={handleAdd} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="branch">Branch</Label>
-                  <select
-                    id="branch"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={branchId}
-                    onChange={(e) => setBranchId(e.target.value)}
+                  <Select
+                    value={branchId || 'none'}
+                    onValueChange={(val) => setBranchId(val === 'none' ? '' : val)}
                     disabled={saving}
                   >
-                    <option value="">Select a branch...</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name} ({branch.abbreviation})
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="branch">
+                      <SelectValue placeholder="Select a branch..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select a branch...</SelectItem>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} ({branch.abbreviation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="semester_number">Semester Number</Label>
-                  <select
-                    id="semester_number"
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={semesterNumber}
-                    onChange={(e) => setSemesterNumber(e.target.value)}
+                  <Select
+                    value={semesterNumber || 'none'}
+                    onValueChange={(val) => setSemesterNumber(val === 'none' ? '' : val)}
                     disabled={saving}
                   >
-                    <option value="">Select semester...</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                      <option key={num} value={num}>
-                        Semester {num}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="semester_number">
+                      <SelectValue placeholder="Select semester..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Select semester...</SelectItem>
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+                        <SelectItem key={num} value={String(num)}>
+                          Semester {num}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -197,7 +204,7 @@ export default function Semesters() {
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader>
               <CardTitle>Semesters List</CardTitle>
               <CardDescription>

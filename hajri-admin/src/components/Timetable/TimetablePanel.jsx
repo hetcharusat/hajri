@@ -396,7 +396,7 @@ export function TimetablePanel({ batchId, refreshKey }) {
     return (
       <div className="flex items-center justify-center h-full p-12">
         <div className="text-center space-y-3">
-          <Clock className="h-12 w-12 text-muted-foreground/20 mx-auto" />
+          <Clock className="h-12 w-12 text-muted-foreground/30 mx-auto" />
           <p className="text-sm font-medium">No period template configured</p>
           <p className="text-xs text-muted-foreground">Go to Periods tab to create your schedule</p>
         </div>

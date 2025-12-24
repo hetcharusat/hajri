@@ -14,14 +14,43 @@ import { Label } from '@/components/ui/label'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-function cellKey(dayIdx, periodId) {
-  // periodId is a UUID (contains '-') so we must use a safe delimiter.
-  return `${dayIdx}|${periodId}`
+function normalizeTimeString(value) {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return `${trimmed}:00`
+  if (/^\d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed
+  return trimmed
+}
+
+function newSlotId() {
+  return (
+    globalThis?.crypto?.randomUUID?.() ||
+    `slot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  )
+}
+
+function normalizeSlots(rawSlots) {
+  const slotsArray = Array.isArray(rawSlots) ? rawSlots : []
+  return slotsArray
+    .map((s, idx) => ({
+      id: s?.id || newSlotId(),
+      period_number: Number.isFinite(Number(s?.period_number)) ? Number(s.period_number) : idx + 1,
+      name: typeof s?.name === 'string' ? s.name : `Period ${idx + 1}`,
+      start_time: normalizeTimeString(s?.start_time || '09:00:00'),
+      end_time: normalizeTimeString(s?.end_time || '10:00:00'),
+      is_break: Boolean(s?.is_break),
+    }))
+    .sort((a, b) => a.period_number - b.period_number)
+}
+
+function cellKey(dayIdx, startTime) {
+  // Use a delimiter that won't appear in time strings.
+  return `${dayIdx}|${normalizeTimeString(startTime)}`
 }
 
 function parseCellKey(key) {
-  const [dayIdx, periodId] = key.split('|')
-  return { dayIdx: Number.parseInt(dayIdx, 10), periodId }
+  const [dayIdx, startTime] = key.split('|')
+  return { dayIdx: Number.parseInt(dayIdx, 10), startTime: normalizeTimeString(startTime) }
 }
 
 function DraggableOffering({ offering, isDragging }) {
@@ -42,17 +71,20 @@ function DraggableOffering({ offering, isDragging }) {
       ref={setNodeRef}
       type="button"
       className={cn(
-        'w-full rounded-md border border-border bg-card px-3 py-2 text-left transition-colors hover:bg-secondary/50 cursor-grab active:cursor-grabbing',
-        isDragging && 'opacity-50'
+        'w-full min-w-[180px] rounded-lg border-2 border-border bg-card px-3 py-2.5 text-left transition-all duration-150',
+        'hover:border-primary hover:bg-secondary/70 hover:shadow-lg hover:scale-[1.03]',
+        'cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-primary',
+        'shadow-md',
+        isDragging && 'opacity-30 scale-90'
       )}
       {...listeners}
       {...attributes}
       style={style}
     >
-      <div className="font-mono text-xs text-muted-foreground">{offering.subjects?.code || '—'}</div>
-      <div className="text-sm font-medium text-foreground">{offering.subjects?.name || '—'}</div>
-      <div className="text-xs text-muted-foreground">
-        {offering.faculty?.name ? `Faculty: ${offering.faculty.name}` : 'Faculty: TBA'}
+      <div className="font-mono text-xs font-bold text-muted-foreground">{offering.subjects?.code || '—'}</div>
+      <div className="text-sm font-semibold text-foreground line-clamp-2 break-words">{offering.subjects?.name || '—'}</div>
+      <div className="text-xs text-muted-foreground truncate">
+        {offering.faculty?.name ? `👤 ${offering.faculty.name}` : '👤 TBA'}
       </div>
     </button>
   )
@@ -67,10 +99,11 @@ function DroppableCell({ cellId, event, isOver, children }) {
   return (
     <div
       ref={setNodeRef}
+      data-droppable="true"
       className={cn(
-        'min-h-[100px] w-full transition-all',
-        isOver && 'bg-primary/20 ring-2 ring-primary ring-inset rounded-md',
-        !event && 'hover:bg-secondary/10 rounded-md'
+        'min-h-[110px] w-full transition-all duration-150 rounded-lg p-1',
+        isOver && 'bg-primary/25 ring-4 ring-primary ring-inset shadow-2xl scale-[1.01]',
+        !event && 'hover:bg-accent/10'
       )}
     >
       {children}
@@ -95,11 +128,11 @@ function TimetableBlock({ event, onEdit, onDelete, viewMode }) {
   const colorClass = typeColors[subjectType] || typeColors.LECTURE
 
   return (
-    <div className={cn('group relative rounded border p-2 shadow-sm h-full', colorClass)}>
-      <div className="font-mono text-[10px] font-bold opacity-80">{code || '—'}</div>
-      <div className="text-xs font-medium leading-tight mt-0.5">{name || '—'}</div>
-      <div className="text-[10px] opacity-70 mt-1 truncate">👤 {facultyName || 'TBA'}</div>
-      <div className="text-[10px] opacity-70 truncate">📍 {roomNum || 'No room'}</div>
+    <div className={cn('group relative rounded-lg border-2 p-2 shadow-md hover:shadow-xl transition-all duration-150 h-full min-h-[100px] flex flex-col', colorClass)}>
+      <div className="font-mono text-[11px] font-bold opacity-95">{code || '—'}</div>
+      <div className="text-xs font-semibold leading-tight mt-1 line-clamp-2 break-words flex-1">{name || '—'}</div>
+      <div className="text-[10px] opacity-80 mt-1 truncate">👤 {facultyName || 'TBA'}</div>
+      <div className="text-[10px] opacity-80 truncate">📍 {roomNum || 'No room'}</div>
 
       {viewMode === 'draft' && (
         <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -130,10 +163,6 @@ export default function TimetableNew() {
   const { selectedNode } = useStructureStore()
   const { batchId } = useScopeStore()
 
-  if (!selectedNode || !batchId) {
-    return <Navigate to="/app/overview" replace />
-  }
-
   const [viewMode, setViewMode] = useState('draft')
   const [error, setError] = useState('')
 
@@ -146,7 +175,7 @@ export default function TimetableNew() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 3,
       },
     })
   )
@@ -179,39 +208,11 @@ export default function TimetableNew() {
 
   const templateId = activeTemplateQuery.data?.id || null
 
-  const periodsQuery = useQuery({
-    queryKey: ['periodsForTimetable', { templateId }],
-    enabled: Boolean(templateId),
-    queryFn: async () => {
-      if (!supabase) throw new Error('Supabase not configured')
+  const periods = useMemo(() => normalizeSlots(activeTemplateQuery.data?.slots), [activeTemplateQuery.data?.slots])
 
-      // Prefer all-days periods (day_of_week is null). This matches the typical institutional template.
-      const base = await supabase
-        .from('periods')
-        .select('id, template_id, period_number, name, start_time, end_time, is_break, day_of_week')
-        .eq('template_id', templateId)
-        .is('day_of_week', null)
-        .order('period_number', { ascending: true })
-
-      if (base.error) throw base.error
-      if ((base.data || []).length > 0) return base.data
-
-      // Fallback: if the template uses day-specific periods, at least return something.
-      const any = await supabase
-        .from('periods')
-        .select('id, template_id, period_number, name, start_time, end_time, is_break, day_of_week')
-        .eq('template_id', templateId)
-        .order('period_number', { ascending: true })
-      if (any.error) throw any.error
-      return any.data || []
-    },
-  })
-
-  const periods = periodsQuery.data || []
-
-  const periodById = useMemo(() => {
+  const periodByStartTime = useMemo(() => {
     const map = new Map()
-    for (const p of periods) map.set(p.id, p)
+    for (const p of periods) map.set(normalizeTimeString(p.start_time), p)
     return map
   }, [periods])
 
@@ -291,7 +292,7 @@ export default function TimetableNew() {
       if (!supabase) throw new Error('Supabase not configured')
       const res = await supabase
         .from('timetable_events')
-        .select(`id, version_id, offering_id, period_id, day_of_week, start_time, end_time, room_id, rooms:room_id(room_number), course_offerings(*, subjects(code, name, type), faculty(name))`)
+        .select(`id, version_id, offering_id, day_of_week, start_time, end_time, room_id, rooms:room_id(room_number), course_offerings(*, subjects(code, name, type), faculty(name))`)
         .eq('version_id', activeVersionId)
       if (res.error) throw res.error
       return res.data || []
@@ -310,28 +311,20 @@ export default function TimetableNew() {
       : null
 
   const placeEventMutation = useMutation({
-    mutationFn: async ({ versionId, offeringId, dayIdx, periodId, startTime, endTime, roomId }) => {
+    mutationFn: async ({ versionId, offeringId, dayIdx, startTime, endTime, roomId }) => {
       if (!supabase) throw new Error('Supabase not configured')
       if (!versionId) throw new Error('No active timetable version')
 
-      // Ensure the slot is unique.
-      // Some deployments enforce uniqueness by (version_id, day_of_week, start_time) while the slot-id
-      // model uses (version_id, day_of_week, period_id). Clear both to avoid 409s.
-      const delByPeriod = await supabase
-        .from('timetable_events')
-        .delete()
-        .eq('version_id', versionId)
-        .eq('day_of_week', dayIdx)
-        .eq('period_id', periodId)
+      const normalizedStart = normalizeTimeString(startTime)
+      const normalizedEnd = normalizeTimeString(endTime)
 
-      if (delByPeriod.error) throw delByPeriod.error
-
+      // Ensure the slot is unique by (version_id, day_of_week, start_time)
       const delByTime = await supabase
         .from('timetable_events')
         .delete()
         .eq('version_id', versionId)
         .eq('day_of_week', dayIdx)
-        .eq('start_time', startTime)
+        .eq('start_time', normalizedStart)
 
       if (delByTime.error) throw delByTime.error
 
@@ -339,10 +332,9 @@ export default function TimetableNew() {
         {
           version_id: versionId,
           offering_id: offeringId,
-          period_id: periodId,
           day_of_week: dayIdx,
-          start_time: startTime,
-          end_time: endTime,
+          start_time: normalizedStart,
+          end_time: normalizedEnd,
           room_id: roomId || null,
         },
       ])
@@ -420,7 +412,6 @@ export default function TimetableNew() {
   const busy =
     roomsQuery.isFetching ||
     activeTemplateQuery.isFetching ||
-    periodsQuery.isFetching ||
     offeringsQuery.isFetching ||
     eventsQuery.isFetching ||
     placeEventMutation.isLoading ||
@@ -431,7 +422,6 @@ export default function TimetableNew() {
   const loading =
     roomsQuery.isLoading ||
     activeTemplateQuery.isLoading ||
-    periodsQuery.isLoading ||
     workspaceQuery.isLoading ||
     offeringsQuery.isLoading ||
     eventsQuery.isLoading
@@ -452,8 +442,8 @@ export default function TimetableNew() {
     const offeringData = active.data.current?.offering
     if (!offeringData) return
 
-    const { dayIdx, periodId } = parseCellKey(over.id)
-    const period = periodById.get(periodId)
+    const { dayIdx, startTime } = parseCellKey(over.id)
+    const period = periodByStartTime.get(normalizeTimeString(startTime))
     if (!period) return
     if (period.is_break) {
       setError('Cannot schedule classes into a break slot')
@@ -461,7 +451,7 @@ export default function TimetableNew() {
     }
 
     const conflictingEvent = events.find(
-      (e) => e.day_of_week === dayIdx && e.period_id === periodId
+      (e) => e.day_of_week === dayIdx && normalizeTimeString(e.start_time) === normalizeTimeString(period.start_time)
     )
 
     if (conflictingEvent) {
@@ -472,7 +462,6 @@ export default function TimetableNew() {
     setRoomPickDialog({
       offeringId: offeringData.id,
       dayIdx,
-      periodId,
       startTime: period.start_time,
       endTime: period.end_time,
     })
@@ -481,12 +470,13 @@ export default function TimetableNew() {
   async function saveWithRoom(roomId) {
     if (!roomPickDialog) return
     if (!activeVersionId) return
-    const { offeringId, dayIdx, periodId, startTime, endTime } = roomPickDialog
+    const { offeringId, dayIdx, startTime, endTime } = roomPickDialog
+    const normalizedStart = normalizeTimeString(startTime)
 
     const facultyConflict = events.find(
       (e) =>
         e.day_of_week === dayIdx &&
-        e.period_id === periodId &&
+        normalizeTimeString(e.start_time) === normalizedStart &&
         e.course_offerings?.faculty_id === offerings.find((o) => o.id === offeringId)?.faculty_id
     )
 
@@ -497,7 +487,7 @@ export default function TimetableNew() {
 
     if (roomId) {
       const roomConflict = events.find(
-        (e) => e.day_of_week === dayIdx && e.period_id === periodId && e.room_id === roomId
+        (e) => e.day_of_week === dayIdx && normalizeTimeString(e.start_time) === normalizedStart && e.room_id === roomId
       )
       if (roomConflict) {
         setError('Conflict: room is already occupied at this time')
@@ -511,7 +501,6 @@ export default function TimetableNew() {
         versionId: activeVersionId,
         offeringId,
         dayIdx,
-        periodId,
         startTime,
         endTime,
         roomId: roomId || null,
@@ -530,11 +519,12 @@ export default function TimetableNew() {
   }
 
   async function handleEditSave(eventId, facultyId, roomId) {
+    const normalizedStart = normalizeTimeString(editDialog?.event?.start_time)
     const roomConflict = events.find(
       (e) =>
         e.id !== eventId &&
         e.day_of_week === editDialog.event.day_of_week &&
-        e.period_id === editDialog.event.period_id &&
+        normalizeTimeString(e.start_time) === normalizedStart &&
         e.room_id === roomId
     )
     if (roomConflict) {
@@ -546,7 +536,7 @@ export default function TimetableNew() {
       (e) =>
         e.id !== eventId &&
         e.day_of_week === editDialog.event.day_of_week &&
-        e.period_id === editDialog.event.period_id &&
+        normalizeTimeString(e.start_time) === normalizedStart &&
         e.course_offerings?.faculty_id === facultyId
     )
     if (facultyConflict) {
@@ -574,10 +564,14 @@ export default function TimetableNew() {
     return <div className="py-12 text-sm text-muted-foreground">Loading timetable…</div>
   }
 
+  if (!selectedNode || !batchId) {
+    return <Navigate to="/app/overview" replace />
+  }
+
   const eventsByCell = {}
   for (const ev of events) {
-    if (!ev.period_id) continue
-    const key = cellKey(ev.day_of_week, ev.period_id)
+    if (!ev.start_time) continue
+    const key = cellKey(ev.day_of_week, ev.start_time)
     eventsByCell[key] = ev
   }
 
@@ -665,10 +659,10 @@ export default function TimetableNew() {
 
         <div className="space-y-6">
           {/* Available Offerings - Top */}
-          <Card>
+          <Card className="border-2">
             <CardHeader>
-              <CardTitle>Available Offerings</CardTitle>
-              <CardDescription>Drag to schedule</CardDescription>
+              <CardTitle className="text-xl">Available Offerings</CardTitle>
+              <CardDescription>Drag any offering to schedule it in the timetable below</CardDescription>
             </CardHeader>
             <CardContent>
               {!batchId ? (
@@ -678,7 +672,7 @@ export default function TimetableNew() {
                   No offerings for this batch. Create them in Assignments first.
                 </div>
               ) : (
-                <div className="flex gap-2 overflow-x-auto pb-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[300px] overflow-y-auto p-2">
                   {offerings.map((o) => (
                     <DraggableOffering key={o.id} offering={o} isDragging={activeId === `offering-${o.id}`} />
                   ))}
@@ -699,17 +693,17 @@ export default function TimetableNew() {
                     {blockEditingReason || 'Period template required to render the grid.'}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto border border-border rounded-lg">
-                    <table className="w-full border-collapse min-w-[1000px]">
+                  <div className="overflow-x-auto border-2 border-border rounded-xl shadow-xl">
+                    <table className="w-full border-collapse min-w-[1200px]">
                       <thead>
                         <tr>
-                          <th className="border-r border-b border-border bg-muted/40 px-3 py-2 text-left text-xs font-medium w-24 sticky left-0 z-10">
+                          <th className="border-r-2 border-b-2 border-border bg-muted/70 px-4 py-3 text-left text-xs font-bold w-32 sticky left-0 z-10 shadow-md">
                             Period
                           </th>
                           {DAYS.map((day) => (
                             <th
                               key={day}
-                              className="border-r border-b border-border bg-muted/40 px-2 py-2 text-center text-xs font-medium min-w-[140px]"
+                              className="border-r-2 border-b-2 border-border bg-muted/70 px-3 py-3 text-center text-sm font-bold min-w-[180px] w-[180px]"
                             >
                               {day}
                             </th>
@@ -719,27 +713,27 @@ export default function TimetableNew() {
                       <tbody>
                         {periods.map((period) => (
                           <tr key={period.id}>
-                            <td className="border-r border-b border-border bg-muted/20 px-3 py-2 align-top sticky left-0 z-10">
-                              <div className="text-xs font-medium text-foreground whitespace-nowrap">
-                                {typeof period.period_number === 'number' ? `Period ${period.period_number}` : 'Period'}
+                            <td className="border-r-2 border-b-2 border-border bg-muted/40 px-4 py-3 align-top sticky left-0 z-10 shadow-md">
+                              <div className="text-sm font-bold text-foreground whitespace-nowrap">
+                                {typeof period.period_number === 'number' ? `P${period.period_number}` : 'Period'}
                               </div>
-                              <div className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                {period.start_time}-{period.end_time}
+                              <div className="text-[11px] text-muted-foreground whitespace-nowrap font-mono mt-1">
+                                {period.start_time.slice(0,5)}-{period.end_time.slice(0,5)}
                               </div>
-                              <div className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                {period.is_break ? 'BREAK' : period.name}
+                              <div className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
+                                {period.is_break ? '☕ BREAK' : period.name}
                               </div>
                             </td>
                             {DAYS.map((_, dayIdx) => {
-                              const key = cellKey(dayIdx, period.id)
+                              const key = cellKey(dayIdx, period.start_time)
                               const ev = eventsByCell[key]
                               const isOver = overId === key
 
                               return (
-                                <td key={dayIdx} className="border-r border-b border-border p-1 align-top min-w-[140px]">
+                                <td key={dayIdx} className="border-r-2 border-b-2 border-border p-2 align-top min-w-[180px] w-[180px] bg-background">
                                   {period.is_break ? (
-                                    <div className="h-24 flex items-center justify-center rounded-md bg-muted/30 text-[10px] text-muted-foreground">
-                                      BREAK
+                                    <div className="h-[110px] flex items-center justify-center rounded-lg bg-amber-100/50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700 text-sm font-bold text-amber-800 dark:text-amber-300 shadow-sm">
+                                      ☕ BREAK
                                     </div>
                                   ) : (
                                     <DroppableCell cellId={key} event={ev} isOver={isOver}>
@@ -751,8 +745,8 @@ export default function TimetableNew() {
                                           onDelete={handleDelete}
                                         />
                                       ) : (
-                                        <div className="h-24 flex items-center justify-center text-[10px] text-muted-foreground">
-                                          {viewMode === 'draft' ? 'Drop here' : '—'}
+                                        <div className="h-[110px] flex items-center justify-center text-xs font-medium text-muted-foreground border-2 border-dashed border-border/40 rounded-lg hover:border-primary/50 hover:bg-accent/5 transition-all">
+                                          {viewMode === 'draft' ? '➕ Drop Here' : '—'}
                                         </div>
                                       )}
                                     </DroppableCell>
@@ -779,9 +773,10 @@ export default function TimetableNew() {
 
         <DragOverlay>
           {activeOffering ? (
-            <div className="rounded-md border border-border bg-card px-3 py-2 shadow-lg opacity-90">
-              <div className="font-mono text-xs text-muted-foreground">{activeOffering.subjects?.code || '—'}</div>
-              <div className="text-sm font-medium text-foreground">{activeOffering.subjects?.name || '—'}</div>
+            <div className="rounded-xl border-4 border-primary bg-card px-4 py-3 shadow-2xl opacity-90 rotate-3 scale-110 min-w-[180px]">
+              <div className="font-mono text-sm font-bold text-primary">{activeOffering.subjects?.code || '—'}</div>
+              <div className="text-base font-bold text-foreground mt-1 line-clamp-2">{activeOffering.subjects?.name || '—'}</div>
+              <div className="text-xs text-muted-foreground mt-1">👤 {activeOffering.faculty?.name || 'TBA'}</div>
             </div>
           ) : null}
         </DragOverlay>

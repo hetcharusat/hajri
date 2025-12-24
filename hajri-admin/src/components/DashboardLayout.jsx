@@ -64,7 +64,7 @@ export function DashboardLayout({ children }) {
                     >
                       <item.icon
                         className={cn(
-                          isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
+                          isActive ? 'text-primary' : 'text-foreground/70 group-hover:text-foreground',
                           'mr-3 h-5 w-5 flex-shrink-0'
                         )}
                       />
@@ -94,7 +94,7 @@ export function DashboardLayout({ children }) {
                     onClick={handleSignOut}
                     className="ml-2 inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
                   >
-                    <LogOut className="h-5 w-5" />
+                    <LogOut className="h-5 w-5 text-foreground" />
                   </button>
                 </div>
               </div>

@@ -8,6 +8,40 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/lib/supabase'
 import { AlertCircle, Plus, Trash2, Clock, Edit2, Check, X } from 'lucide-react'
 
+function newSlotId() {
+  return (
+    globalThis?.crypto?.randomUUID?.() ||
+    `slot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  )
+}
+
+function normalizeTimeString(value) {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return `${trimmed}:00`
+  if (/^\d{2}:\d{2}:\d{2}$/.test(trimmed)) return trimmed
+  return trimmed
+}
+
+function toTimeInputValue(value) {
+  const normalized = normalizeTimeString(value)
+  return normalized ? normalized.slice(0, 5) : ''
+}
+
+function normalizeSlots(rawSlots) {
+  const slotsArray = Array.isArray(rawSlots) ? rawSlots : []
+  return slotsArray
+    .map((s, idx) => ({
+      id: s?.id || newSlotId(),
+      period_number: Number.isFinite(Number(s?.period_number)) ? Number(s.period_number) : idx + 1,
+      name: typeof s?.name === 'string' ? s.name : `Period ${idx + 1}`,
+      start_time: normalizeTimeString(s?.start_time || '09:00:00'),
+      end_time: normalizeTimeString(s?.end_time || '10:00:00'),
+      is_break: Boolean(s?.is_break),
+    }))
+    .sort((a, b) => a.period_number - b.period_number)
+}
+
 export default function PeriodTemplates() {
   const queryClient = useQueryClient()
 
@@ -15,21 +49,6 @@ export default function PeriodTemplates() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(null)
   const [editingPeriodId, setEditingPeriodId] = useState(null)
   const [editForm, setEditForm] = useState({})
-
-  async function isTemplateUsedByPublishedTimetable(templateId) {
-    if (!supabase) throw new Error('Supabase not configured')
-    const { count, error } = await supabase
-      .from('timetable_events')
-      .select('id, timetable_versions!inner(status), periods!inner(template_id)', {
-        count: 'exact',
-        head: true,
-      })
-      .eq('timetable_versions.status', 'published')
-      .eq('periods.template_id', templateId)
-
-    if (error) throw error
-    return (count || 0) > 0
-  }
 
   const templatesQuery = useQuery({
     queryKey: ['periodTemplates'],
@@ -59,33 +78,8 @@ export default function PeriodTemplates() {
     return templates.find((t) => t.id === effectiveTemplateId) || null
   }, [effectiveTemplateId, templates])
 
-  const periodsQuery = useQuery({
-    queryKey: ['periods', { templateId: effectiveTemplateId }],
-    enabled: Boolean(effectiveTemplateId),
-    queryFn: async () => {
-      if (!supabase) throw new Error('Supabase not configured')
-      const { data, error } = await supabase
-        .from('periods')
-        .select('*')
-        .eq('template_id', effectiveTemplateId)
-        .order('period_number', { ascending: true })
-      if (error) throw error
-      return data || []
-    },
-  })
-
-  const periods = periodsQuery.data || []
-
-  const templateUsedByPublishedQuery = useQuery({
-    queryKey: ['periodTemplateUsage', { templateId: effectiveTemplateId }],
-    enabled: Boolean(effectiveTemplateId),
-    queryFn: async () => {
-      return isTemplateUsedByPublishedTimetable(effectiveTemplateId)
-    },
-  })
-
-  const templateUsedByPublished = Boolean(templateUsedByPublishedQuery.data)
-  const canEditStructure = Boolean(activeTemplate) && !templateUsedByPublished
+  const periods = useMemo(() => normalizeSlots(activeTemplate?.slots), [activeTemplate?.slots])
+  const canEditStructure = Boolean(activeTemplate)
 
   const setActiveMutation = useMutation({
     mutationFn: async (templateId) => {
@@ -112,7 +106,7 @@ export default function PeriodTemplates() {
       if (!supabase) throw new Error('Supabase not configured')
       const { data, error } = await supabase
         .from('period_templates')
-        .insert([{ name, is_active: false }])
+        .insert([{ name, slots: [], is_active: false }])
         .select('*')
         .single()
       if (error) throw error
@@ -128,9 +122,6 @@ export default function PeriodTemplates() {
   const deleteTemplateMutation = useMutation({
     mutationFn: async (templateId) => {
       if (!supabase) throw new Error('Supabase not configured')
-      const used = await isTemplateUsedByPublishedTimetable(templateId)
-      if (used) throw new Error('Cannot delete: template is used by a published timetable')
-
       const { error } = await supabase.from('period_templates').delete().eq('id', templateId)
       if (error) throw error
     },
@@ -138,77 +129,34 @@ export default function PeriodTemplates() {
       setSelectedTemplateId(null)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['periodTemplates'] }),
-        queryClient.invalidateQueries({ queryKey: ['periods'] }),
-        queryClient.invalidateQueries({ queryKey: ['periodTemplateUsage'] }),
       ])
     },
     onError: (e) => setUiError(e?.message || 'Failed to delete template'),
   })
 
-  const upsertPeriodMutation = useMutation({
-    mutationFn: async ({ templateId, periodId, patch }) => {
+  const updateSlotsMutation = useMutation({
+    mutationFn: async ({ templateId, slots }) => {
       if (!supabase) throw new Error('Supabase not configured')
-      const used = await isTemplateUsedByPublishedTimetable(templateId)
-      if (used) throw new Error('Cannot edit periods: template is used by a published timetable')
-      const { error } = await supabase.from('periods').update(patch).eq('id', periodId)
+      const { error } = await supabase
+        .from('period_templates')
+        .update({ slots })
+        .eq('id', templateId)
       if (error) throw error
     },
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['periods', { templateId: effectiveTemplateId }] }),
-        queryClient.invalidateQueries({ queryKey: ['periodTemplateUsage', { templateId: effectiveTemplateId }] }),
-      ])
+      await queryClient.invalidateQueries({ queryKey: ['periodTemplates'] })
     },
-    onError: (e) => setUiError(e?.message || 'Failed to update period'),
-  })
-
-  const addPeriodMutation = useMutation({
-    mutationFn: async (templateId) => {
-      if (!supabase) throw new Error('Supabase not configured')
-      const used = await isTemplateUsedByPublishedTimetable(templateId)
-      if (used) throw new Error('Cannot add periods: template is used by a published timetable')
-
-      const maxPeriod = Math.max(...periods.map((p) => p.period_number), 0)
-      const { error } = await supabase.from('periods').insert([
-        {
-          template_id: templateId,
-          period_number: maxPeriod + 1,
-          name: `Period ${maxPeriod + 1}`,
-          start_time: '09:00:00',
-          end_time: '10:00:00',
-          is_break: false,
-        },
-      ])
-      if (error) throw error
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['periods', { templateId: effectiveTemplateId }] })
-    },
-    onError: (e) => setUiError(e?.message || 'Failed to add period'),
-  })
-
-  const deletePeriodMutation = useMutation({
-    mutationFn: async ({ templateId, periodId }) => {
-      if (!supabase) throw new Error('Supabase not configured')
-      const used = await isTemplateUsedByPublishedTimetable(templateId)
-      if (used) throw new Error('Cannot delete periods: template is used by a published timetable')
-
-      const { error } = await supabase.from('periods').delete().eq('id', periodId)
-      if (error) throw error
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['periods', { templateId: effectiveTemplateId }] })
-    },
-    onError: (e) => setUiError(e?.message || 'Failed to delete period'),
+    onError: (e) => setUiError(e?.message || 'Failed to update template slots'),
   })
 
   function startEditPeriod(period) {
     setEditingPeriodId(period.id)
     setEditForm({
+      id: period.id,
       period_number: period.period_number,
       name: period.name,
-      start_time: period.start_time,
-      end_time: period.end_time,
+      start_time: toTimeInputValue(period.start_time),
+      end_time: toTimeInputValue(period.end_time),
       is_break: period.is_break,
     })
   }
@@ -239,30 +187,47 @@ export default function PeriodTemplates() {
   function handleAddPeriod() {
     if (!effectiveTemplateId) return
     setUiError('')
-    addPeriodMutation.mutate(effectiveTemplateId)
+
+    const maxPeriod = Math.max(...periods.map((p) => p.period_number), 0)
+    const nextNumber = maxPeriod + 1
+    const nextSlots = [...periods, {
+      id: newSlotId(),
+      period_number: nextNumber,
+      name: `Period ${nextNumber}`,
+      start_time: '09:00:00',
+      end_time: '10:00:00',
+      is_break: false,
+    }]
+
+    updateSlotsMutation.mutate({ templateId: effectiveTemplateId, slots: nextSlots })
   }
 
   function handleDeletePeriod(periodId) {
     if (!effectiveTemplateId) return
     if (!confirm('Delete this period?')) return
     setUiError('')
-    deletePeriodMutation.mutate({ templateId: effectiveTemplateId, periodId })
+
+    const nextSlots = periods.filter((p) => p.id !== periodId)
+    updateSlotsMutation.mutate({ templateId: effectiveTemplateId, slots: nextSlots })
   }
 
   function handleSavePeriod(periodId) {
     if (!effectiveTemplateId) return
     setUiError('')
-    upsertPeriodMutation.mutate({
-      templateId: effectiveTemplateId,
-      periodId,
-      patch: {
-        period_number: Number(editForm.period_number),
-        name: editForm.name,
-        start_time: editForm.start_time,
-        end_time: editForm.end_time,
-        is_break: Boolean(editForm.is_break),
-      },
-    })
+
+    const nextSlots = periods.map((p) =>
+      p.id === periodId
+        ? {
+            ...p,
+            period_number: Number(editForm.period_number),
+            name: editForm.name,
+            start_time: normalizeTimeString(editForm.start_time),
+            end_time: normalizeTimeString(editForm.end_time),
+            is_break: Boolean(editForm.is_break),
+          }
+        : p
+    )
+    updateSlotsMutation.mutate({ templateId: effectiveTemplateId, slots: nextSlots })
     cancelEdit()
   }
 
@@ -270,8 +235,7 @@ export default function PeriodTemplates() {
   const error =
     uiError ||
     templatesQuery.error?.message ||
-    periodsQuery.error?.message ||
-    templateUsedByPublishedQuery.error?.message
+    null
 
   if (loading) {
     return <div className="py-12 text-center text-muted-foreground">Loading period templates...</div>
@@ -297,19 +261,7 @@ export default function PeriodTemplates() {
         </div>
       )}
 
-      {activeTemplate && templateUsedByPublished && (
-        <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-4">
-          <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">Template locked</p>
-            <p className="text-sm text-muted-foreground">
-              This template is referenced by a published timetable. Destructive edits (add/delete/edit periods, delete template) are blocked.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -374,7 +326,7 @@ export default function PeriodTemplates() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
+  <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -382,7 +334,7 @@ export default function PeriodTemplates() {
                 <CardDescription>Slot ordering is controlled by period number; break slots are supported.</CardDescription>
               </div>
               {activeTemplate && (
-                <Button size="sm" onClick={handleAddPeriod} disabled={!canEditStructure || addPeriodMutation.isLoading}>
+                <Button size="sm" onClick={handleAddPeriod} disabled={updateSlotsMutation.isLoading}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Period
                 </Button>
@@ -392,7 +344,7 @@ export default function PeriodTemplates() {
           <CardContent>
             {!activeTemplate ? (
               <div className="text-center py-12 text-muted-foreground">
-                <Clock className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-30" />
                 <p>Select a template from the left to edit its periods</p>
               </div>
             ) : periods.length === 0 ? (
@@ -422,14 +374,14 @@ export default function PeriodTemplates() {
                               value={editForm.period_number ?? ''}
                               onChange={(e) => setEditForm({ ...editForm, period_number: e.target.value })}
                               className="w-16"
-                              disabled={!canEditStructure}
+                              disabled={!canEditStructure || updateSlotsMutation.isLoading}
                             />
                           </TableCell>
                           <TableCell>
                             <Input
                               value={editForm.name ?? ''}
                               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                              disabled={!canEditStructure}
+                              disabled={!canEditStructure || updateSlotsMutation.isLoading}
                             />
                           </TableCell>
                           <TableCell>
@@ -437,7 +389,7 @@ export default function PeriodTemplates() {
                               type="time"
                               value={editForm.start_time ?? ''}
                               onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
-                              disabled={!canEditStructure}
+                              disabled={!canEditStructure || updateSlotsMutation.isLoading}
                             />
                           </TableCell>
                           <TableCell>
@@ -445,7 +397,7 @@ export default function PeriodTemplates() {
                               type="time"
                               value={editForm.end_time ?? ''}
                               onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
-                              disabled={!canEditStructure}
+                              disabled={!canEditStructure || updateSlotsMutation.isLoading}
                             />
                           </TableCell>
                           <TableCell>
@@ -453,7 +405,7 @@ export default function PeriodTemplates() {
                               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                               value={editForm.is_break ? 'break' : 'class'}
                               onChange={(e) => setEditForm({ ...editForm, is_break: e.target.value === 'break' })}
-                              disabled={!canEditStructure}
+                              disabled={!canEditStructure || updateSlotsMutation.isLoading}
                             >
                               <option value="class">Class</option>
                               <option value="break">Break</option>
@@ -465,11 +417,16 @@ export default function PeriodTemplates() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleSavePeriod(period.id)}
-                                disabled={!canEditStructure || upsertPeriodMutation.isLoading}
+                                disabled={!canEditStructure || updateSlotsMutation.isLoading}
                               >
                                 <Check className="h-4 w-4 text-green-600" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={cancelEdit}
+                                disabled={updateSlotsMutation.isLoading}
+                              >
                                 <X className="h-4 w-4 text-destructive" />
                               </Button>
                             </div>
@@ -490,10 +447,20 @@ export default function PeriodTemplates() {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
-                              <Button size="sm" variant="ghost" onClick={() => startEditPeriod(period)} disabled={!canEditStructure}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => startEditPeriod(period)}
+                                disabled={updateSlotsMutation.isLoading}
+                              >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDeletePeriod(period.id)} disabled={!canEditStructure}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeletePeriod(period.id)}
+                                disabled={updateSlotsMutation.isLoading}
+                              >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </div>
