@@ -44,6 +44,9 @@ export default defineConfig({
           { text: 'Architecture', link: '/hajri-admin/ARCHITECTURE' },
           { text: 'Schema V2', link: '/hajri-admin/SCHEMA_V2' },
           { text: 'Workflows', link: '/hajri-admin/WORKFLOWS' },
+          { text: 'Deployment', link: '/hajri-admin/DEPLOYMENT' },
+          { text: 'OAuth & Auth', link: '/hajri-admin/OAUTH' },
+          { text: 'Performance', link: '/hajri-admin/PERFORMANCE' },
           { text: 'Roadmap', link: '/hajri-admin/ROADMAP' }
         ]
       },
