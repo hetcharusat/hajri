@@ -27,10 +27,23 @@ function App() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    // Handle OAuth callback from hash fragment
+    const handleOAuthCallback = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      if (hashParams.get('access_token')) {
+        // OAuth callback detected, let Supabase handle it
+        await supabase.auth.getSession();
+        // Clean up the URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
+    handleOAuthCallback().then(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      });
     });
 
     const {
