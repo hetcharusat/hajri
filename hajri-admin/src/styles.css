@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Locked palette (see prompt.txt requirement #4) */
+    --background: 224 40.5% 7.3%; /* #0B0F1A */
+    --foreground: 220 13% 91%; /* #E5E7EB */
+
+    --card: 222.2 47.4% 11.2%; /* #0F172A */
+    --card-foreground: 220 13% 91%;
+
+    --popover: 222.2 47.4% 11.2%;
+    --popover-foreground: 220 13% 91%;
+
+    --primary: 217.2 91.2% 59.8%; /* #3B82F6 */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 220.9 39.3% 11%; /* #111827 */
+    --secondary-foreground: 220 13% 91%;
+
+    --muted: 220.9 39.3% 11%;
+    --muted-foreground: 217.9 10.6% 64.9%; /* #9CA3AF */
+
+    --accent: 220.9 39.3% 11%;
+    --accent-foreground: 220 13% 91%;
+
+    --destructive: 0 84.2% 60.2%; /* #EF4444 */
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220.9 39.3% 11%;
+    --input: 220.9 39.3% 11%;
+    --ring: 217.2 91.2% 59.8%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

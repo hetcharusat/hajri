@@ -1,0 +1,192 @@
+1 ) You are a senior frontend architect.
+
+TASK:
+Refactor the existing Tree Explorer so it behaves like a Discord / VS Code sidebar.
+
+REQUIREMENTS (STRICT):
+- Tree Explorer is the ONLY sidebar.
+- Default width: 260px
+- Min width: 200px
+- Max width: 360px
+- Resizable by dragging right edge (cursor: col-resize)
+- Double-click resize handle resets to default width
+- Collapsible into icon-only rail (48–56px)
+- Collapse/expand state must persist (localStorage)
+- Width must persist (localStorage)
+
+UX RULES:
+- Tree controls global scope
+- Tree never renders inside page content
+- Main content must flex smoothly (no layout jump)
+- Transition duration: 120–150ms ease-out
+- No opacity animation on main content
+
+DO NOT:
+- Add a traditional sidebar
+- Duplicate navigation
+- Add scope selectors elsewhere
+
+OUTPUT:
+Explain the component responsibilities and layout behavior.
+Do NOT redesign visuals. Focus on behavior and architecture.
+
+
+
+
+
+2)You are designing a global scope architecture for a tree-driven admin UI.
+
+TASK:
+Define a SINGLE source of truth for scope, controlled ONLY by the Tree Explorer.
+
+SCOPE MODEL:
+- departmentId
+- branchId
+- semesterId
+- classId
+- batchId
+- level (department | branch | semester | class | batch)
+
+RULES:
+- Tree updates scope
+- Pages consume scope (read-only)
+- Pages NEVER modify scope
+- Lower levels imply higher levels
+- Scope change invalidates all data queries
+
+INTEGRATION:
+- Designed for Zustand (global UI state)
+- Data fetching via TanStack Query
+- Queries must always be scoped
+
+OUTPUT:
+1. Scope lifecycle (tree click → UI update)
+2. Rules for partial scope (e.g. semester selected, no class)
+3. How pages should guard against missing scope
+
+DO NOT:
+- Add dropdowns
+- Add fallback guessing
+- Allow multiple scope setters
+
+
+3) You are fixing a broken Overview page in a scope-driven admin UI.
+
+TASK:
+Redesign Overview so it reacts dynamically to the current scope.
+
+RULE:
+Overview content MUST change based on scope.level.
+
+EXPECTED BEHAVIOR:
+- No scope selected → show “Select a node from the tree”
+- Department → show branches & semesters count
+- Branch → show semesters & active semesters
+- Semester → show classes, subjects count
+- Class → show batches, assignments
+- Batch → show timetable status (draft/published)
+
+UX RULES:
+- No forms
+- No global metrics
+- No scope selectors
+- Overview is read-only
+
+OUTPUT:
+Explain conditional rendering logic based on scope.level.
+No code. No visuals.
+
+
+4)You are auditing a dark-mode admin UI with inconsistent colors.
+
+TASK:
+Normalize the color system and eliminate accidental light surfaces.
+
+BASE PALETTE (LOCK THIS):
+- App background: #0B0F1A
+- Sidebar: #0F172A
+- Surface: #111827
+- Card: #0F172A
+- Primary: #3B82F6
+- Success: #22C55E
+- Warning: #F59E0B
+- Error: #EF4444
+- Text primary: #E5E7EB
+- Text muted: #9CA3AF
+
+RULES:
+- No bg-white anywhere
+- Cards slightly lighter than background
+- Sidebar darker than content
+- Tabs must not look disabled when active
+
+STACK:
+- Tailwind CSS
+- shadcn/ui
+- CSS variables allowed
+
+OUTPUT:
+1. Surface hierarchy rules
+2. Common mistakes to remove (bg-white, bg-background)
+3. How to prevent contrast noise
+
+DO NOT redesign layout.
+
+
+5) You are rebuilding a timetable UI for an academic admin system.
+
+IMPORTANT:
+The existing AI-generated timetable UX is WRONG.
+You must discard it.
+
+TASK:
+Design a canvas-first timetable interaction model.
+
+REQUIREMENTS:
+- Scope = Batch (from tree)
+- Grid = days × time slots
+- Offerings are draggable items
+- Grid cells are droppable targets
+- Drag → slot highlights
+- Drop → immediate placement
+- Click block → edit room / faculty
+- No “Apply” button for basic actions
+
+ROOM HANDLING:
+- Room is selected at drop time
+- Room is NOT part of offering
+- Validate room conflicts immediately
+
+TECH:
+- @dnd-kit
+- No react-beautiful-dnd
+- Grid treated as canvas, not table
+
+OUTPUT:
+1. Interaction flow (drag → drop → edit)
+2. Why this UX works for admins
+3. Rules that prevent silent conflicts
+
+NO CODE.
+NO FORMS.
+NO STATIC TABLE UX.
+
+6)You are designing a scalable admin UI with potentially large datasets.
+
+TASK:
+Define filtering, virtualization, and performance rules.
+
+REQUIREMENTS:
+- Tree scope limits data
+- No global lists rendered
+- All queries scoped
+- TanStack Query for caching
+- TanStack Table for large tables
+- Search always scoped
+
+OUTPUT:
+1. Data loading rules per page
+2. How to prevent scroll explosion
+3. UX indicators for incomplete setup
+
+DO NOT suggest pagination everywhere blindly.

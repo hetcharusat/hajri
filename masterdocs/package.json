@@ -1,0 +1,15 @@
+{
+  "name": "hajri-masterdocs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev . --host 127.0.0.1 --port 5179",
+    "docs:build": "vitepress build .",
+    "docs:preview": "vitepress preview . --host 127.0.0.1 --port 5180",
+    "docs:build:node20": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build-static.ps1",
+    "docs:serve:static": "powershell -NoProfile -ExecutionPolicy Bypass -File ./serve-static.ps1"
+  },
+  "devDependencies": {
+    "vitepress": "^1.5.0"
+  }
+}

@@ -64,15 +64,15 @@
 
 ## 🎯 BUILD PHASES (REVISED - START WITH OCR)
 
-### **PHASE 1: OCR BACKEND + TESTING (Week 1-2)** 🔥
+### **PHASE 1: OCR BACKEND + TESTING (Week 1-2)** ✅ **COMPLETE**
 *Prove the hardest part works first - no UI needed*
 
 #### 1.1 Setup OCR Backend Project
-- [ ] Create Python virtual environment
-- [ ] Install FastAPI + PaddleOCR + Tesseract
-- [ ] Setup project structure (see below)
-- [ ] Add environment config (.env)
-- [ ] Configure CORS for local testing
+- [x] Create Python virtual environment
+- [x] Install FastAPI + PaddleOCR + Tesseract
+- [x] Setup project structure (see below)
+- [x] Add environment config (.env)
+- [x] Configure CORS for local testing
 
 #### 1.2 Build Image Preprocessing Pipeline
 ```python
@@ -141,11 +141,11 @@ GET /test/sample
 - [ ] Test both OCR engines
 - [ ] Document failure cases
 
-**Deliverable:** Working OCR API with >80% accuracy on test images
+**Deliverable:** Working OCR API with >80% accuracy on test images ✅
 
 ---
 
-### **PHASE 2: DATABASE + ADMIN DASHBOARD (Week 3-4)**
+### **PHASE 2: DATABASE + ADMIN DASHBOARD (Week 3-4)** 🔥 **IN PROGRESS**
 *Build the backend infrastructure*
 
 #### 2.1 Setup Supabase Project
@@ -659,24 +659,23 @@ main
 - Tesseract as fallback for reliability
 
 ### **Right Now (Today):**
-1. ✅ Review this plan (you're here)
-2. **Create OCR backend project**
-3. Install PaddleOCR + dependencies
-4. Build image preprocessing pipeline
-5. Test with 1-2 dashboard screenshots
+1. ✅ OCR backend built and deployed to Render
+2. **Create Supabase project**
+3. Run database schema SQL (provided below)
+4. Setup admin dashboard with Vite + React
+5. Implement Google OAuth login
 
 ### **This Week:**
-- Complete OCR extraction + parsing
-- Build FastAPI endpoints
-- Test with 10+ real screenshots
-- Measure accuracy metrics
-- Deploy to Render
+- Build departments + subjects CRUD
+- Create timetable editor UI
+- Test admin → Supabase flow
+- Add CSV import for subjects
+- Connect OCR backend to admin (optional)
 
 ### **Next Week:**
-- Setup Supabase schema
-- Build admin dashboard basics
-- Connect admin → Supabase
-- Test timetable CRUD flow
+- Deploy admin dashboard (Netlify/Vercel)
+- Start Android app setup
+- Test end-to-end admin workflow
 ### **Compose UI Not Updating?**
 - Use `remember` and `mutableStateOf`
 - Check `LaunchedEffect` dependencies

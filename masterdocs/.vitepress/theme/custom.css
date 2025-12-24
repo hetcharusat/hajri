@@ -1,0 +1,12 @@
+:root {
+  /* Keep it simple: neutral + blue accent */
+  --vp-c-brand-1: #2563eb;
+  --vp-c-brand-2: #1d4ed8;
+  --vp-c-brand-3: #1e40af;
+
+  /* Intentionally empty.
+
+  We keep VitePress default theme + colors.
+  Add site-wide styling here only if needed.
+  */
+  --vp-c-text-2: #334155;
