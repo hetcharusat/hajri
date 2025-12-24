@@ -36,8 +36,15 @@ export default function Login() {
     }
     setLoading(true)
     setError('')
+    
+    // Get the current origin (works for both localhost and deployed)
+    const redirectUrl = `${window.location.origin}/`
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
+      options: {
+        redirectTo: redirectUrl
+      }
     })
     if (error) {
       setError(error.message)
