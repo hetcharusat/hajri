@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -177,10 +177,15 @@ export default function OfferingsNew({ embedded = false }) {
   }
 
   const loading = loadingSubjects || loadingOfferings
-  const assignedCount = offerings.length
-  const totalCount = subjects.length
-  const unassignedCount = totalCount - assignedCount
-  const completeCount = offerings.filter(o => o.faculty_id).length
+  
+  // Memoize stats to avoid recalculation on every render
+  const stats = useMemo(() => {
+    const assignedCount = offerings.length
+    const totalCount = subjects.length
+    const unassignedCount = totalCount - assignedCount
+    const completeCount = offerings.filter(o => o.faculty_id).length
+    return { assignedCount, totalCount, unassignedCount, completeCount }
+  }, [offerings, subjects])
 
   // Redirect if no valid selection (AFTER all hooks)
   if (!selectedNode || !batchId) {
@@ -209,7 +214,7 @@ export default function OfferingsNew({ embedded = false }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {unassignedCount > 0 && (
+          {stats.unassignedCount > 0 && (
             <Button 
               onClick={handleAutoAssign}
               disabled={autoAssignMutation.isPending}
@@ -217,7 +222,7 @@ export default function OfferingsNew({ embedded = false }) {
             >
               {autoAssignMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               <Plus className="mr-2 h-4 w-4" />
-              Create {unassignedCount} Missing
+              Create {stats.unassignedCount} Missing
             </Button>
           )}
         </div>
@@ -231,7 +236,7 @@ export default function OfferingsNew({ embedded = false }) {
               <BookOpen className="h-4 w-4" />
               Total Subjects
             </CardDescription>
-            <CardTitle className="text-3xl">{totalCount}</CardTitle>
+            <CardTitle className="text-3xl">{stats.totalCount}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -241,7 +246,7 @@ export default function OfferingsNew({ embedded = false }) {
               <CheckCircle2 className="h-4 w-4 text-green-600" />
               With Faculty
             </CardDescription>
-            <CardTitle className="text-3xl text-green-600">{completeCount}</CardTitle>
+            <CardTitle className="text-3xl text-green-600">{stats.completeCount}</CardTitle>
           </CardHeader>
         </Card>
 
@@ -251,7 +256,7 @@ export default function OfferingsNew({ embedded = false }) {
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               Unassigned
             </CardDescription>
-            <CardTitle className="text-3xl text-amber-600">{unassignedCount}</CardTitle>
+            <CardTitle className="text-3xl text-amber-600">{stats.unassignedCount}</CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -310,7 +315,7 @@ export default function OfferingsNew({ embedded = false }) {
   return embedded ? <div className="space-y-6 p-6">{contentInner}</div> : content
 }
 
-function SubjectOfferingCard({ subject, offering, faculty, rooms, onSave, onDelete, isSaving, isDeleting }) {
+const SubjectOfferingCard = memo(function SubjectOfferingCard({ subject, offering, faculty, rooms, onSave, onDelete, isSaving, isDeleting }) {
   const [editing, setEditing] = useState(!offering)
   const [selectedFacultyId, setSelectedFacultyId] = useState(offering?.faculty_id || '')
   const [selectedRoomId, setSelectedRoomId] = useState(offering?.default_room_id || '')
@@ -524,4 +529,4 @@ function SubjectOfferingCard({ subject, offering, faculty, rooms, onSave, onDele
       </CardContent>
     </Card>
   )
-}
+})

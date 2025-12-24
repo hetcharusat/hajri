@@ -21,19 +21,14 @@ export default function AdminGuard({ children }) {
 
   const checkAdmin = async () => {
     try {
-      console.log('AdminGuard: Checking user:', user.id, user.email)
-      
       const { data, error } = await supabase
         .from('users')
         .select('is_admin')
         .eq('id', user.id)
         .single()
 
-      console.log('AdminGuard: Result:', { data, error })
-
       if (error) {
-        console.error('AdminGuard: Error:', error)
-        // If user doesn't exist, create them
+        // If user doesn't exist, create them with default permissions
         if (error.code === 'PGRST116') {
           const { error: insertError } = await supabase
             .from('users')
@@ -48,7 +43,6 @@ export default function AdminGuard({ children }) {
         setIsAdmin(data?.is_admin === true)
       }
     } catch (e) {
-      console.error('Admin check failed:', e)
       setIsAdmin(false)
     } finally {
       setChecking(false)
