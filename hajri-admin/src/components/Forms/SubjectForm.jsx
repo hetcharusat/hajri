@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { SlidePanel, FormField } from '../SlidePanel/SlidePanel'
 import { Input } from '@/components/ui/input'
+import { EnhancedSelect } from '@/components/ui/enhanced-select'
 import { supabase } from '@/lib/supabase'
 
 export function SubjectForm({ open, onClose, node, mode = 'add', onSuccess }) {
@@ -87,11 +88,33 @@ export function SubjectForm({ open, onClose, node, mode = 'add', onSuccess }) {
     setSemesters(data || [])
   }
 
-  const handleBranchChange = (branchId) => {
+  const handleBranchChange = (selectedOption) => {
     if (lockedToSemesterContext) return
+    const branchId = selectedOption?.value || ''
     setFormData({ ...formData, branch_id: branchId, semester_id: '' })
-    loadSemestersForBranch(branchId)
+    if (branchId) loadSemestersForBranch(branchId)
   }
+
+  const branchOptions = branches.map(b => ({
+    value: b.id,
+    label: `${b.name} (${b.abbreviation})`
+  }))
+
+  const semesterOptions = semesters.map(s => ({
+    value: s.id,
+    label: `Semester ${s.semester_number}`
+  }))
+
+  const typeOptions = [
+    { value: 'LECTURE', label: 'Lecture' },
+    { value: 'PRACTICAL', label: 'Practical' },
+    { value: 'LAB', label: 'Lab' },
+    { value: 'TUTORIAL', label: 'Tutorial' }
+  ]
+
+  const selectedBranch = branchOptions.find(opt => opt.value === formData.branch_id) || null
+  const selectedSemester = semesterOptions.find(opt => opt.value === formData.semester_id) || null
+  const selectedType = typeOptions.find(opt => opt.value === formData.type) || typeOptions[0]
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -175,33 +198,25 @@ export function SubjectForm({ open, onClose, node, mode = 'add', onSuccess }) {
       </FormField>
 
       <FormField label="Branch" required>
-        <select
-          className="flex h-11 w-full rounded-md border-2 border-border bg-background px-4 py-2.5 text-sm font-medium transition-all hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          value={formData.branch_id || ''}
-          onChange={(e) => handleBranchChange(e.target.value)}
-          required
-          disabled={lockedToSemesterContext}
-        >
-          <option value="">Select branch</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>{b.name} ({b.abbreviation})</option>
-          ))}
-        </select>
+        <EnhancedSelect
+          value={selectedBranch}
+          onChange={handleBranchChange}
+          options={branchOptions}
+          placeholder="Select branch"
+          isDisabled={lockedToSemesterContext}
+          isClearable
+        />
       </FormField>
 
       <FormField label="Semester" required>
-        <select
-          className="flex h-11 w-full rounded-md border-2 border-border bg-background px-4 py-2.5 text-sm font-medium transition-all hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          value={formData.semester_id || ''}
-          onChange={(e) => setFormData({ ...formData, semester_id: e.target.value })}
-          required
-          disabled={!formData.branch_id || lockedToSemesterContext}
-        >
-          <option value="">Select semester</option>
-          {semesters.map((s) => (
-            <option key={s.id} value={s.id}>Semester {s.semester_number}</option>
-          ))}
-        </select>
+        <EnhancedSelect
+          value={selectedSemester}
+          onChange={(option) => setFormData({ ...formData, semester_id: option?.value || '' })}
+          options={semesterOptions}
+          placeholder="Select semester"
+          isDisabled={!formData.branch_id || lockedToSemesterContext}
+          isClearable
+        />
       </FormField>
 
       <FormField label="Credits" required>
@@ -216,17 +231,12 @@ export function SubjectForm({ open, onClose, node, mode = 'add', onSuccess }) {
       </FormField>
 
       <FormField label="Type" required>
-        <select
-          className="flex h-11 w-full rounded-md border-2 border-border bg-background px-4 py-2.5 text-sm font-medium transition-all hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-          value={formData.type || 'LECTURE'}
-          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-          required
-        >
-          <option value="LECTURE">Lecture</option>
-          <option value="PRACTICAL">Practical</option>
-          <option value="LAB">Lab</option>
-          <option value="TUTORIAL">Tutorial</option>
-        </select>
+        <EnhancedSelect
+          value={selectedType}
+          onChange={(option) => setFormData({ ...formData, type: option?.value || 'LECTURE' })}
+          options={typeOptions}
+          placeholder="Select type"
+        />
       </FormField>
     </SlidePanel>
   )

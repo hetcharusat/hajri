@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { EnhancedSelect } from '@/components/ui/enhanced-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { supabase } from '@/lib/supabase'
 import { useScopeStore } from '@/lib/store'
@@ -197,7 +198,7 @@ export default function Subjects() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-form gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="credits">Credits</Label>
                     <Input
@@ -212,16 +213,16 @@ export default function Subjects() {
 
                   <div className="space-y-2">
                     <Label htmlFor="type">Type</Label>
-                    <select
-                      id="type"
-                      className="flex h-10 w-full rounded-md border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    >
-                      <option value="LECTURE">Lecture</option>
-                      <option value="LAB">Lab</option>
-                      <option value="TUTORIAL">Tutorial</option>
-                    </select>
+                    <EnhancedSelect
+                      value={{ value: formData.type, label: formData.type === 'LECTURE' ? 'Lecture' : formData.type === 'LAB' ? 'Lab' : 'Tutorial' }}
+                      onChange={(option) => setFormData({ ...formData, type: option?.value || 'LECTURE' })}
+                      options={[
+                        { value: 'LECTURE', label: 'Lecture' },
+                        { value: 'LAB', label: 'Lab' },
+                        { value: 'TUTORIAL', label: 'Tutorial' }
+                      ]}
+                      placeholder="Select type"
+                    />
                   </div>
                 </div>
 

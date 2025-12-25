@@ -374,35 +374,35 @@ export default function Overview() {
       {statsQuery.isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> : null}
 
       {level === 'department' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-responsive gap-4">
           <StatCard label="Branches" value={stats.branchesCount} />
           <StatCard label="Semesters" value={stats.semestersCount} helper="All semesters under this department" />
         </div>
       ) : null}
 
       {level === 'branch' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-responsive gap-4">
           <StatCard label="Semesters" value={stats.semestersCount} />
           <StatCard label="Active Semesters" value={stats.activeSemestersCount} helper="Based on start/end date" />
         </div>
       ) : null}
 
       {level === 'semester' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-responsive gap-4">
           <StatCard label="Classes" value={stats.classesCount} />
           <StatCard label="Subjects" value={stats.subjectsCount} />
         </div>
       ) : null}
 
       {level === 'class' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-responsive gap-4">
           <StatCard label="Batches" value={stats.batchesCount} />
-          <StatCard label="Assignments" value={stats.offeringsCount} helper="Total course offerings across this class’s batches" />
+          <StatCard label="Assignments" value={stats.offeringsCount} helper="Total course offerings across this class's batches" />
         </div>
       ) : null}
 
       {level === 'batch' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-responsive gap-4">
           <StatCard label="Timetable Status" value={stats.timetableStatus} />
           <StatCard label="Scope" value="Batch" helper="Scheduling is always batch-scoped" />
         </div>

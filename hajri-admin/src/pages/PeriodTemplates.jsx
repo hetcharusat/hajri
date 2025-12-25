@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { EnhancedSelect } from '@/components/ui/enhanced-select'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { supabase } from '@/lib/supabase'
 import { AlertCircle, Plus, Trash2, Clock, Edit2, Check, X } from 'lucide-react'
@@ -26,6 +28,23 @@ function normalizeTimeString(value) {
 function toTimeInputValue(value) {
   const normalized = normalizeTimeString(value)
   return normalized ? normalized.slice(0, 5) : ''
+}
+
+function timeStringToDate(timeStr) {
+  if (!timeStr) return null
+  const normalized = normalizeTimeString(timeStr)
+  const [hours, minutes] = normalized.split(':').map(Number)
+  if (isNaN(hours) || isNaN(minutes)) return null
+  const date = new Date()
+  date.setHours(hours, minutes || 0, 0, 0)
+  return date
+}
+
+function dateToTimeString(date) {
+  if (!date || !(date instanceof Date)) return ''
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 function normalizeSlots(rawSlots) {
@@ -157,8 +176,8 @@ export default function PeriodTemplates() {
       id: period.id,
       period_number: period.period_number,
       name: period.name,
-      start_time: toTimeInputValue(period.start_time),
-      end_time: toTimeInputValue(period.end_time),
+      start_time: timeStringToDate(period.start_time),
+      end_time: timeStringToDate(period.end_time),
       is_break: period.is_break,
     })
   }
@@ -209,8 +228,8 @@ export default function PeriodTemplates() {
       id: newSlotId(),
       period_number: Number(newPeriodForm.period_number),
       name: newPeriodForm.name,
-      start_time: normalizeTimeString(newPeriodForm.start_time),
-      end_time: normalizeTimeString(newPeriodForm.end_time),
+      start_time: normalizeTimeString(dateToTimeString(newPeriodForm.start_time)),
+      end_time: normalizeTimeString(dateToTimeString(newPeriodForm.end_time)),
       is_break: Boolean(newPeriodForm.is_break),
     }]
 
@@ -243,8 +262,8 @@ export default function PeriodTemplates() {
             ...p,
             period_number: Number(editForm.period_number),
             name: editForm.name,
-            start_time: normalizeTimeString(editForm.start_time),
-            end_time: normalizeTimeString(editForm.end_time),
+            start_time: normalizeTimeString(dateToTimeString(editForm.start_time)),
+            end_time: normalizeTimeString(dateToTimeString(editForm.end_time)),
             is_break: Boolean(editForm.is_break),
           }
         : p
@@ -409,31 +428,31 @@ export default function PeriodTemplates() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="time"
-                              value={editForm.start_time ?? ''}
-                              onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
+                            <TimePicker
+                              value={editForm.start_time}
+                              onChange={(date) => setEditForm({ ...editForm, start_time: date })}
                               disabled={!canEditStructure || updateSlotsMutation.isLoading}
+                              className="w-full"
                             />
                           </TableCell>
                           <TableCell>
-                            <Input
-                              type="time"
-                              value={editForm.end_time ?? ''}
-                              onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
+                            <TimePicker
+                              value={editForm.end_time}
+                              onChange={(date) => setEditForm({ ...editForm, end_time: date })}
                               disabled={!canEditStructure || updateSlotsMutation.isLoading}
+                              className="w-full"
                             />
                           </TableCell>
                           <TableCell>
-                            <select
-                              className="flex h-10 w-full rounded-md border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                              value={editForm.is_break ? 'break' : 'class'}
-                              onChange={(e) => setEditForm({ ...editForm, is_break: e.target.value === 'break' })}
-                              disabled={!canEditStructure || updateSlotsMutation.isLoading}
-                            >
-                              <option value="class">Class</option>
-                              <option value="break">Break</option>
-                            </select>
+                            <EnhancedSelect
+                              value={editForm.is_break ? { value: 'break', label: 'Break' } : { value: 'class', label: 'Class' }}
+                              onChange={(option) => setEditForm({ ...editForm, is_break: option?.value === 'break' })}
+                              options={[
+                                { value: 'class', label: 'Class' },
+                                { value: 'break', label: 'Break' }
+                              ]}
+                              isDisabled={!canEditStructure || updateSlotsMutation.isLoading}
+                            />
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
@@ -442,7 +461,7 @@ export default function PeriodTemplates() {
                                 variant="ghost"
                                 onClick={() => handleSavePeriod(period.id)}
                                 disabled={!canEditStructure || updateSlotsMutation.isLoading}
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+                                className="text-success hover:text-success hover:bg-success/10"
                               >
                                 <Check className="h-4 w-4" />
                               </Button>
@@ -516,31 +535,31 @@ export default function PeriodTemplates() {
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="time"
-                          value={newPeriodForm.start_time ?? ''}
-                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, start_time: e.target.value })}
+                        <TimePicker
+                          value={newPeriodForm.start_time}
+                          onChange={(date) => setNewPeriodForm({ ...newPeriodForm, start_time: date })}
                           disabled={updateSlotsMutation.isLoading}
+                          className="w-full"
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="time"
-                          value={newPeriodForm.end_time ?? ''}
-                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, end_time: e.target.value })}
+                        <TimePicker
+                          value={newPeriodForm.end_time}
+                          onChange={(date) => setNewPeriodForm({ ...newPeriodForm, end_time: date })}
                           disabled={updateSlotsMutation.isLoading}
+                          className="w-full"
                         />
                       </TableCell>
                       <TableCell>
-                        <select
-                          className="flex h-10 w-full rounded-md border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-                          value={newPeriodForm.is_break ? 'break' : 'class'}
-                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, is_break: e.target.value === 'break' })}
-                          disabled={updateSlotsMutation.isLoading}
-                        >
-                          <option value="class">Class</option>
-                          <option value="break">Break</option>
-                        </select>
+                        <EnhancedSelect
+                          value={newPeriodForm.is_break ? { value: 'break', label: 'Break' } : { value: 'class', label: 'Class' }}
+                          onChange={(option) => setNewPeriodForm({ ...newPeriodForm, is_break: option?.value === 'break' })}
+                          options={[
+                            { value: 'class', label: 'Class' },
+                            { value: 'break', label: 'Break' }
+                          ]}
+                          isDisabled={updateSlotsMutation.isLoading}
+                        />
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end">

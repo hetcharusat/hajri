@@ -265,16 +265,13 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
             </FormField>
             {mode === 'add' && dependencies.departments && (
               <FormField label="Department (Optional)">
-                <select
-                  className="flex h-11 w-full rounded-lg border-2 border-input bg-background px-4 py-2.5 text-sm font-medium shadow-sm transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary focus-visible:shadow-md"
-                  value={formData.department_id || ''}
-                  onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-                >
-                  <option value="">None</option>
-                  {dependencies.departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
+                <EnhancedSelect
+                  value={formData.department_id ? { value: formData.department_id, label: dependencies.departments.find(d => d.id === formData.department_id)?.name || 'None' } : null}
+                  onChange={(option) => setFormData({ ...formData, department_id: option?.value || '' })}
+                  options={dependencies.departments.map(d => ({ value: d.id, label: d.name }))}
+                  placeholder="Select department (optional)"
+                  isClearable
+                />
               </FormField>
             )}
           </>
@@ -284,17 +281,12 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
         return (
           <>
             <FormField label="Semester Number" required>
-              <select
-                className="flex h-11 w-full rounded-lg border-2 border-input bg-background px-4 py-2.5 text-sm font-medium shadow-sm transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary focus-visible:shadow-md"
-                value={formData.semester_number || ''}
-                onChange={(e) => setFormData({ ...formData, semester_number: e.target.value })}
-                required
-              >
-                <option value="">Select semester</option>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                  <option key={n} value={n}>Semester {n}</option>
-                ))}
-              </select>
+              <EnhancedSelect
+                value={formData.semester_number ? { value: formData.semester_number, label: `Semester ${formData.semester_number}` } : null}
+                onChange={(option) => setFormData({ ...formData, semester_number: option?.value || '' })}
+                options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: n, label: `Semester ${n}` }))}
+                placeholder="Select semester"
+              />
             </FormField>
             <FormField label="Start Date" required>
               <Input

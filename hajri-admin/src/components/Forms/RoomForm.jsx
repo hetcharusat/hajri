@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { SlidePanel, FormField } from '../SlidePanel/SlidePanel'
 import { Input } from '@/components/ui/input'
+import { EnhancedSelect } from '@/components/ui/enhanced-select'
 import { supabase } from '@/lib/supabase'
 import { useScopeStore } from '@/lib/store'
 
@@ -100,18 +101,18 @@ export function RoomForm({ open, onClose, node, mode = 'add', onSuccess }) {
       </FormField>
 
       <FormField label="Type" required>
-        <select
-          className="flex h-11 w-full rounded-md border-2 border-input bg-background px-4 py-2.5 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-          value={formData.type || 'CLASSROOM'}
-          onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-          required
-        >
-          <option value="CLASSROOM">Classroom</option>
-          <option value="LAB">Lab</option>
-          <option value="LECTURE_HALL">Lecture Hall</option>
-          <option value="AUDITORIUM">Auditorium</option>
-          <option value="SEMINAR_ROOM">Seminar Room</option>
-        </select>
+        <EnhancedSelect
+          value={{ value: formData.type || 'CLASSROOM', label: formData.type === 'CLASSROOM' ? 'Classroom' : formData.type === 'LAB' ? 'Lab' : formData.type === 'LECTURE_HALL' ? 'Lecture Hall' : formData.type === 'AUDITORIUM' ? 'Auditorium' : formData.type === 'SEMINAR_ROOM' ? 'Seminar Room' : 'Classroom' }}
+          onChange={(option) => setFormData({ ...formData, type: option?.value || 'CLASSROOM' })}
+          options={[
+            { value: 'CLASSROOM', label: 'Classroom' },
+            { value: 'LAB', label: 'Lab' },
+            { value: 'LECTURE_HALL', label: 'Lecture Hall' },
+            { value: 'AUDITORIUM', label: 'Auditorium' },
+            { value: 'SEMINAR_ROOM', label: 'Seminar Room' }
+          ]}
+          placeholder="Select room type"
+        />
       </FormField>
     </SlidePanel>
   )

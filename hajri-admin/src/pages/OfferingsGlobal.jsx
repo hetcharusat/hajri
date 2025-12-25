@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { EnhancedSelect } from '@/components/ui/enhanced-select'
 import { supabase } from '@/lib/supabase'
 import { AlertCircle, BookOpen, Check, Filter, GraduationCap, Layers, MapPin, Plus, Search, Trash2, User, X } from 'lucide-react'
 
@@ -223,7 +224,7 @@ export default function OfferingsGlobal() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Course Offerings - Global View</h1>
-          <p className="text-gray-600 mt-1">Manage all course offerings across semesters and batches</p>
+          <p className="text-muted-foreground mt-1">Manage all course offerings across semesters and batches</p>
         </div>
       </div>
 
@@ -238,50 +239,40 @@ export default function OfferingsGlobal() {
       <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <Filter className="text-gray-500" size={20} />
+            <Filter className="text-foreground" size={20} />
             <h2 className="text-lg font-semibold">Filters</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-responsive gap-4">
             {/* Branch Filter */}
             <div>
-              <label className="block text-sm font-medium mb-2">Branch</label>
-              <select
-                value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Branches</option>
-                {branches.map(branch => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.abbreviation} - {branch.name}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-semibold mb-2 text-foreground">Branch</label>
+              <EnhancedSelect
+                value={selectedBranch ? { value: selectedBranch, label: branches.find(b => b.id === selectedBranch)?.name || 'All Branches' } : null}
+                onChange={(option) => setSelectedBranch(option?.value || '')}
+                options={branches.map(b => ({ value: b.id, label: `${b.abbreviation} - ${b.name}` }))}
+                placeholder="All Branches"
+                isClearable
+              />
             </div>
 
             {/* Semester Filter */}
             <div>
-              <label className="block text-sm font-medium mb-2">Semester</label>
-              <select
-                value={selectedSemester}
-                onChange={(e) => setSelectedSemester(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Semesters</option>
-                {semesters.map(sem => (
-                  <option key={sem.id} value={sem.id}>
-                    Semester {sem.semester_number} - {sem.branches?.abbreviation}
-                  </option>
-                ))}
-              </select>
+              <label className="block text-sm font-semibold mb-2 text-foreground">Semester</label>
+              <EnhancedSelect
+                value={selectedSemester ? { value: selectedSemester, label: semesters.find(s => s.id === selectedSemester) ? `Semester ${semesters.find(s => s.id === selectedSemester).semester_number} - ${semesters.find(s => s.id === selectedSemester).branches?.abbreviation}` : 'All Semesters' } : null}
+                onChange={(option) => setSelectedSemester(option?.value || '')}
+                options={semesters.map(s => ({ value: s.id, label: `Semester ${s.semester_number} - ${s.branches?.abbreviation}` }))}
+                placeholder="All Semesters"
+                isClearable
+              />
             </div>
 
             {/* Search */}
             <div>
               <label className="block text-sm font-medium mb-2">Search</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
                 <Input
                   type="text"
                   placeholder="Search subjects..."
@@ -328,14 +319,14 @@ export default function OfferingsGlobal() {
 
       {/* Content Area */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 text-muted-foreground">Loading...</div>
       ) : (
         <>
           {/* By Subject View */}
           {viewMode === 'by-subject' && (
             <div className="space-y-3">
               {filteredSubjects.length === 0 ? (
-                <Card className="p-8 text-center text-gray-500">
+                <Card className="p-8 text-center text-muted-foreground border-2">
                   No subjects found matching your filters
                 </Card>
               ) : (
@@ -347,7 +338,7 @@ export default function OfferingsGlobal() {
                     <Card key={subject.id} className="overflow-hidden">
                       {/* Subject Header */}
                       <div
-                        className="p-4 bg-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition"
+                        className="p-4 bg-muted/30 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition border-2 border-border rounded-lg"
                         onClick={() => toggleExpand(subject.id)}
                       >
                         <div className="flex items-center gap-4">
@@ -355,16 +346,16 @@ export default function OfferingsGlobal() {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-lg">{subject.code}</span>
-                              <span className={`text-xs px-2 py-1 rounded-full border ${subjectTypeColors[subject.type] || 'bg-gray-100 text-gray-800 border-gray-300'}`}>
+                              <span className={`text-xs px-2 py-1 rounded-full border-2 ${subjectTypeColors[subject.type] || 'bg-muted text-foreground border-border'}`}>
                                 {subject.type}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-600">{subject.name}</p>
+                            <p className="text-sm text-foreground font-medium">{subject.name}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <span className="text-sm text-gray-500">{subjectOfferings.length} offerings</span>
-                          <span className="text-sm text-gray-500">
+                          <span className="text-sm text-muted-foreground">{subjectOfferings.length} offerings</span>
+                          <span className="text-sm text-muted-foreground">
                             Sem {subject.semesters?.semester_number} ({subject.semesters?.branches?.abbreviation})
                           </span>
                         </div>
@@ -374,7 +365,7 @@ export default function OfferingsGlobal() {
                       {isExpanded && (
                         <div className="p-4 space-y-3">
                           {subjectOfferings.length === 0 ? (
-                            <div className="text-center py-4 text-gray-500 text-sm">
+                            <div className="text-center py-4 text-muted-foreground text-sm">
                               No offerings yet for this subject
                             </div>
                           ) : (
@@ -392,22 +383,19 @@ export default function OfferingsGlobal() {
 
                           {/* Add Offering Button */}
                           <div className="pt-2 border-t">
-                            <select
-                              className="w-full px-3 py-2 border rounded-lg text-sm"
-                              onChange={(e) => {
-                                if (e.target.value) {
-                                  handleCreateOffering(subject.id, e.target.value)
-                                  e.target.value = ''
+                            <EnhancedSelect
+                              onChange={(option) => {
+                                if (option?.value) {
+                                  handleCreateOffering(subject.id, option.value)
                                 }
                               }}
-                            >
-                              <option value="">+ Add offering to batch...</option>
-                              {batches.map(batch => (
-                                <option key={batch.id} value={batch.id}>
-                                  Batch {batch.batch_letter} (Sem {batch.classes?.semesters?.semester_number})
-                                </option>
-                              ))}
-                            </select>
+                              options={batches.map(batch => ({
+                                value: batch.id,
+                                label: `Batch ${batch.batch_letter} (Sem ${batch.classes?.semesters?.semester_number})`
+                              }))}
+                              placeholder="+ Add offering to batch..."
+                              isClearable
+                            />
                           </div>
                         </div>
                       )}
@@ -422,7 +410,7 @@ export default function OfferingsGlobal() {
           {viewMode === 'by-batch' && (
             <div className="space-y-3">
               {batches.length === 0 ? (
-                <Card className="p-8 text-center text-gray-500">
+                <Card className="p-8 text-center text-muted-foreground border-2">
                   No batches found matching your filters
                 </Card>
               ) : (
@@ -434,26 +422,26 @@ export default function OfferingsGlobal() {
                     <Card key={batch.id} className="overflow-hidden">
                       {/* Batch Header */}
                       <div
-                        className="p-4 bg-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition"
+                        className="p-4 bg-muted/30 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition border-2 border-border rounded-lg"
                         onClick={() => toggleExpand(batch.id)}
                       >
                         <div className="flex items-center gap-4">
                           <Layers className="text-purple-600" size={20} />
                           <div>
                             <span className="font-semibold text-lg">Batch {batch.batch_letter}</span>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-foreground font-medium">
                               Semester {batch.classes?.semesters?.semester_number} - {batch.classes?.semesters?.branches?.abbreviation}
                             </p>
                           </div>
                         </div>
-                        <span className="text-sm text-gray-500">{batchOfferings.length} subjects</span>
+                        <span className="text-sm text-muted-foreground">{batchOfferings.length} subjects</span>
                       </div>
 
                       {/* Offerings List */}
                       {isExpanded && (
                         <div className="p-4 space-y-3">
                           {batchOfferings.length === 0 ? (
-                            <div className="text-center py-4 text-gray-500 text-sm">
+                            <div className="text-center py-4 text-muted-foreground text-sm">
                               No subjects assigned to this batch yet
                             </div>
                           ) : (
@@ -482,7 +470,7 @@ export default function OfferingsGlobal() {
           {viewMode === 'by-faculty' && (
             <div className="space-y-3">
               {faculty.length === 0 ? (
-                <Card className="p-8 text-center text-gray-500">
+                <Card className="p-8 text-center text-muted-foreground border-2">
                   No faculty members found
                 </Card>
               ) : (
@@ -494,7 +482,7 @@ export default function OfferingsGlobal() {
                     <Card key={fac.id} className="overflow-hidden">
                       {/* Faculty Header */}
                       <div
-                        className="p-4 bg-gray-50 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition"
+                        className="p-4 bg-muted/30 flex items-center justify-between cursor-pointer hover:bg-muted/50 transition border-2 border-border rounded-lg"
                         onClick={() => toggleExpand(fac.id)}
                       >
                         <div className="flex items-center gap-4">
@@ -503,22 +491,22 @@ export default function OfferingsGlobal() {
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-lg">{fac.name}</span>
                               {fac.abbr && (
-                                <span className="text-xs px-2 py-1 bg-gray-200 rounded">
+                                <span className="text-xs px-2 py-1 bg-muted rounded border-2 border-border">
                                   {fac.abbr}
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-600">{fac.email}</p>
+                            <p className="text-sm text-foreground font-medium">{fac.email}</p>
                           </div>
                         </div>
-                        <span className="text-sm text-gray-500">{facultyOfferings.length} courses</span>
+                        <span className="text-sm text-muted-foreground">{facultyOfferings.length} courses</span>
                       </div>
 
                       {/* Offerings List */}
                       {isExpanded && (
                         <div className="p-4 space-y-3">
                           {facultyOfferings.length === 0 ? (
-                            <div className="text-center py-4 text-gray-500 text-sm">
+                            <div className="text-center py-4 text-muted-foreground text-sm">
                               No courses assigned to this faculty yet
                             </div>
                           ) : (
@@ -588,19 +576,19 @@ function OfferingRow({ offering, faculty, rooms, onUpdate, onDelete, showSubject
           {/* Subject Info */}
           {showSubject && (
             <div className="flex items-center gap-2">
-              <BookOpen size={16} className="text-gray-400" />
+              <BookOpen size={16} className="text-muted-foreground" />
               <span className="font-medium">{offering.subjects?.code}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full border ${subjectTypeColors[offering.subjects?.type] || 'bg-gray-100 text-gray-800 border-gray-300'}`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full border-2 ${subjectTypeColors[offering.subjects?.type] || 'bg-muted text-foreground border-border'}`}>
                 {offering.subjects?.type}
               </span>
-              <span className="text-sm text-gray-600">{offering.subjects?.name}</span>
+              <span className="text-sm text-foreground font-medium">{offering.subjects?.name}</span>
             </div>
           )}
 
           {/* Batch Info */}
           {showBatch && (
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Layers size={14} className="text-gray-400" />
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Layers size={14} className="text-muted-foreground" />
               <span>Batch {offering.batches?.batch_letter}</span>
               <span className="text-gray-400">•</span>
               <span>Sem {offering.batches?.classes?.semesters?.semester_number}</span>
@@ -609,24 +597,24 @@ function OfferingRow({ offering, faculty, rooms, onUpdate, onDelete, showSubject
 
           {/* Faculty Selection */}
           <div className="flex items-center gap-2">
-            <User size={16} className="text-gray-400" />
+            <User size={16} className="text-muted-foreground" />
             {isEditing ? (
-              <select
-                value={selectedFacultyId}
-                onChange={(e) => setSelectedFacultyId(e.target.value)}
-                className="flex-1 px-3 py-2 border-2 border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-              >
-                <option value="">Select Faculty...</option>
-                {faculty.map(f => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} {f.abbr && `(${f.abbr})`}
-                  </option>
-                ))}
-              </select>
+              <div className="flex-1">
+                <EnhancedSelect
+                  value={selectedFacultyId ? { value: selectedFacultyId, label: faculty.find(f => f.id === selectedFacultyId) ? `${faculty.find(f => f.id === selectedFacultyId).name} ${faculty.find(f => f.id === selectedFacultyId).abbr ? `(${faculty.find(f => f.id === selectedFacultyId).abbr})` : ''}` : 'Select Faculty...' } : null}
+                  onChange={(option) => setSelectedFacultyId(option?.value || '')}
+                  options={faculty.map(f => ({
+                    value: f.id,
+                    label: `${f.name} ${f.abbr ? `(${f.abbr})` : ''}`
+                  }))}
+                  placeholder="Select Faculty..."
+                  isClearable
+                />
+              </div>
             ) : (
-              <span className="text-sm">
+              <span className="text-sm text-foreground">
                 {offering.faculty?.name || (
-                  <span className="text-gray-400">No faculty assigned</span>
+                  <span className="text-muted-foreground">No faculty assigned</span>
                 )}
               </span>
             )}
@@ -634,24 +622,24 @@ function OfferingRow({ offering, faculty, rooms, onUpdate, onDelete, showSubject
 
           {/* Room Selection */}
           <div className="flex items-center gap-2">
-            <MapPin size={16} className="text-gray-400" />
+            <MapPin size={16} className="text-muted-foreground" />
             {isEditing ? (
-              <select
-                value={selectedRoomId}
-                onChange={(e) => setSelectedRoomId(e.target.value)}
-                className="flex-1 px-3 py-2 border-2 border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
-              >
-                <option value="">Select Room...</option>
-                {filteredRooms.map(r => (
-                  <option key={r.id} value={r.id}>
-                    {r.room_number} ({r.type})
-                  </option>
-                ))}
-              </select>
+              <div className="flex-1">
+                <EnhancedSelect
+                  value={selectedRoomId ? { value: selectedRoomId, label: filteredRooms.find(r => r.id === selectedRoomId) ? `${filteredRooms.find(r => r.id === selectedRoomId).room_number} (${filteredRooms.find(r => r.id === selectedRoomId).type})` : 'Select Room...' } : null}
+                  onChange={(option) => setSelectedRoomId(option?.value || '')}
+                  options={filteredRooms.map(r => ({
+                    value: r.id,
+                    label: `${r.room_number} (${r.type})`
+                  }))}
+                  placeholder="Select Room..."
+                  isClearable
+                />
+              </div>
             ) : (
-              <span className="text-sm">
+              <span className="text-sm text-foreground">
                 {offering.rooms?.room_number || (
-                  <span className="text-gray-400">No room assigned</span>
+                  <span className="text-muted-foreground">No room assigned</span>
                 )}
               </span>
             )}

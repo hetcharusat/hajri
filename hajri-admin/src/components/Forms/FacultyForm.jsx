@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { SlidePanel, FormField } from '../SlidePanel/SlidePanel'
 import { Input } from '@/components/ui/input'
+import { EnhancedSelect } from '@/components/ui/enhanced-select'
 import { supabase } from '@/lib/supabase'
 
 export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
@@ -313,17 +314,14 @@ export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
 
       {schema.supportsDepartmentId && (
         <FormField label="Department (Optional)">
-          <select
-            className="flex h-11 w-full rounded-md border-2 border-border bg-background px-4 py-2.5 text-sm font-medium transition-all hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            value={formData.department_id || ''}
-            onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
-            disabled={lockedToDepartment}
-          >
-            <option value="">None</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+          <EnhancedSelect
+            value={departments.find(d => d.id === formData.department_id) ? { value: formData.department_id, label: departments.find(d => d.id === formData.department_id).name } : null}
+            onChange={(option) => setFormData({ ...formData, department_id: option?.value || '' })}
+            options={departments.map(d => ({ value: d.id, label: d.name }))}
+            placeholder="Select department (optional)"
+            isDisabled={lockedToDepartment}
+            isClearable
+          />
         </FormField>
       )}
 

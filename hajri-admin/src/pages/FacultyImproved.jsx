@@ -172,7 +172,7 @@ export default function FacultyImproved() {
           <p className="text-foreground font-medium">{searchTerm ? 'No faculty members found matching your search' : 'No faculty members yet'}</p>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-responsive gap-4">
           {filteredFaculty.map(fac => (
             <Card key={fac.id} className="p-4 border-2 hover:shadow-md transition-all">
               <div className="space-y-3">

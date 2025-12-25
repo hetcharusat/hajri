@@ -235,7 +235,7 @@ export default function OfferingsNew({ embedded = false }) {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-responsive gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardDescription className="flex items-center gap-2">
@@ -496,7 +496,7 @@ const SubjectOfferingCard = memo(function SubjectOfferingCard({ subject, offerin
         ) : (
           <div className="space-y-3">
             {/* Display Mode */}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-form gap-4">
               <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
                 <GraduationCap className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
