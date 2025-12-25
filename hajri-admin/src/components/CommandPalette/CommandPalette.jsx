@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Command, Search, Building2, GraduationCap, Calendar, Grid3x3, Target, Clock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
-import { useStructureStore } from '@/lib/store'
+import { useStructureStore, useCommandPaletteStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 const NODE_ICONS = {
@@ -14,34 +14,40 @@ const NODE_ICONS = {
 }
 
 export function CommandPalette() {
-  const [open, setOpen] = useState(false)
+  const { isOpen, open, close, toggle } = useCommandPaletteStore()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
-  const { setSelectedNode, recentNodes } = useStructureStore()
+  const { selectNodeAndReveal, recentNodes } = useStructureStore()
 
   useEffect(() => {
     const down = (e) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        setOpen((prev) => !prev)
+        toggle()
       }
       if (e.key === 'Escape') {
-        setOpen(false)
+        close()
       }
     }
 
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
-  }, [])
+  }, [toggle, close])
 
   useEffect(() => {
-    if (open && query.length > 1) {
+    if (isOpen && query.length > 1) {
       searchAll()
     } else {
       setResults([])
     }
-  }, [query, open])
+  }, [query, isOpen])
+
+  const handleSelect = (node) => {
+    selectNodeAndReveal(node)
+    close()
+    setQuery('')
+  }
 
   const searchAll = async () => {
     setLoading(true)
@@ -91,11 +97,11 @@ export function CommandPalette() {
       const { data: semesters } = await supabase
         .from('semesters')
         .select('id, semester_number, branch_id, branches(name, abbreviation, department_id, departments(name))')
-        .limit(10)
+        .limit(20)
       
       semesters?.forEach((s) => {
         const semName = `Semester ${s.semester_number}`
-        if (semName.toLowerCase().includes(q) || s.branches?.name.toLowerCase().includes(q)) {
+        if (semName.toLowerCase().includes(q) || s.branches?.name.toLowerCase().includes(q) || s.branches?.abbreviation?.toLowerCase().includes(q)) {
           allResults.push({
             id: s.id,
             type: 'semester',
@@ -120,7 +126,98 @@ export function CommandPalette() {
         }
       })
 
-      setResults(allResults.slice(0, 10))
+      // Search classes
+      const { data: classes } = await supabase
+        .from('classes')
+        .select('id, name, class_number, semester_id, semesters(semester_number, branch_id, branches(name, abbreviation, department_id, departments(name)))')
+        .or(`name.ilike.%${q}%`)
+        .limit(10)
+      
+      classes?.forEach((c) => {
+        const className = c.name || `Class ${c.class_number}`
+        if (className.toLowerCase().includes(q)) {
+          const sem = c.semesters
+          const branch = sem?.branches
+          allResults.push({
+            id: c.id,
+            type: 'class',
+            name: className,
+            meta: sem ? `Semester ${sem.semester_number}` : null,
+            semester_id: c.semester_id,
+            parentPath: branch ? [
+              {
+                id: branch.department_id,
+                type: 'department',
+                name: branch.departments?.name || '',
+                parentPath: [],
+              },
+              {
+                id: sem.branch_id,
+                type: 'branch',
+                name: branch.name,
+                meta: branch.abbreviation,
+                parentPath: [],
+              },
+              {
+                id: c.semester_id,
+                type: 'semester',
+                name: `Semester ${sem.semester_number}`,
+                parentPath: [],
+              }
+            ] : [],
+          })
+        }
+      })
+
+      // Search batches
+      const { data: batches } = await supabase
+        .from('batches')
+        .select('id, name, batch_letter, class_id, classes(name, class_number, semester_id, semesters(semester_number, branch_id, branches(name, abbreviation, department_id, departments(name))))')
+        .or(`name.ilike.%${q}%,batch_letter.ilike.%${q}%`)
+        .limit(10)
+      
+      batches?.forEach((b) => {
+        const batchName = b.name || `Batch ${b.batch_letter}`
+        const cls = b.classes
+        const sem = cls?.semesters
+        const branch = sem?.branches
+        allResults.push({
+          id: b.id,
+          type: 'batch',
+          name: batchName,
+          meta: cls?.name || `Class ${cls?.class_number}`,
+          class_id: b.class_id,
+          parentPath: branch ? [
+            {
+              id: branch.department_id,
+              type: 'department',
+              name: branch.departments?.name || '',
+              parentPath: [],
+            },
+            {
+              id: sem.branch_id,
+              type: 'branch',
+              name: branch.name,
+              meta: branch.abbreviation,
+              parentPath: [],
+            },
+            {
+              id: cls.semester_id,
+              type: 'semester',
+              name: `Semester ${sem.semester_number}`,
+              parentPath: [],
+            },
+            {
+              id: b.class_id,
+              type: 'class',
+              name: cls.name || `Class ${cls.class_number}`,
+              parentPath: [],
+            }
+          ] : [],
+        })
+      })
+
+      setResults(allResults.slice(0, 12))
     } catch (error) {
       console.error('Search failed:', error)
     } finally {
@@ -128,16 +225,10 @@ export function CommandPalette() {
     }
   }
 
-  const handleSelect = (node) => {
-    setSelectedNode(node)
-    setOpen(false)
-    setQuery('')
-  }
-
-  if (!open) return null
+  if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={close}>
       <div className="fixed left-1/2 top-20 -translate-x-1/2 w-full max-w-2xl px-4" onClick={(e) => e.stopPropagation()}>
         <div className="bg-card border-2 border-border rounded-2xl shadow-2xl overflow-hidden">
           {/* Search Input */}

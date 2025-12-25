@@ -17,6 +17,7 @@ import TimetableNew from "./pages/TimetableNew.jsx";
 import PeriodTemplates from "./pages/PeriodTemplates.jsx";
 import Settings from "./pages/Settings.jsx";
 import Overview from "./pages/Overview.jsx";
+import AcademicCalendar from "./pages/AcademicCalendar.jsx";
 
 function App() {
   const { loading, setUser, setSession, setLoading } = useAuthStore();
@@ -111,6 +112,7 @@ function App() {
             <Route path="period-templates" element={<PeriodTemplates />} />
             <Route path="assignments" element={<OfferingsNew embedded={true} />} />
             <Route path="timetable" element={<TimetableNew />} />
+            <Route path="academic-calendar" element={<AcademicCalendar />} />
           </Route>
 
             {/* Back-compat */}

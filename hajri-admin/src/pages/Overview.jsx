@@ -9,14 +9,34 @@ import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 import { useScopeStore, useStructureStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
-import { Plus, Edit2, Trash2 } from 'lucide-react'
+import { Plus, Edit2, Trash2, RefreshCw, Sparkles, TrendingUp, Users, BookOpen, Layers } from 'lucide-react'
 
-function StatCard({ label, value, helper }) {
+function StatCard({ label, value, helper, icon: Icon, color = 'primary' }) {
+  const colorClasses = {
+    primary: 'from-primary/10 to-primary/5 border-primary/20',
+    blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
+    green: 'from-green-500/10 to-green-500/5 border-green-500/20',
+    purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
+    amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20',
+  }
+  
   return (
-    <Card className="p-6 border-2 hover:shadow-md transition-shadow">
-      <div className="text-sm font-semibold text-muted-foreground mb-2">{label}</div>
-      <div className="mt-1 text-3xl font-bold text-foreground">{value}</div>
-      {helper ? <div className="mt-2 text-xs text-muted-foreground">{helper}</div> : null}
+    <Card className={cn(
+      "p-6 border-2 hover:shadow-lg transition-all duration-300 bg-gradient-to-br",
+      colorClasses[color] || colorClasses.primary
+    )}>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-sm font-semibold text-muted-foreground mb-2">{label}</div>
+          <div className="text-3xl font-bold text-foreground">{value}</div>
+          {helper && <div className="mt-2 text-xs text-muted-foreground">{helper}</div>}
+        </div>
+        {Icon && (
+          <div className="h-10 w-10 rounded-xl bg-background/80 flex items-center justify-center shadow-sm">
+            <Icon className="h-5 w-5 text-muted-foreground" />
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
@@ -24,7 +44,7 @@ function StatCard({ label, value, helper }) {
 export default function Overview() {
   const queryClient = useQueryClient()
   const { departmentId, branchId, semesterId, classId, batchId, level } = useScopeStore()
-  const { selectedNode, selectNodeAndReveal } = useStructureStore()
+  const { selectedNode, selectNodeAndReveal, triggerRefresh, clearSelection } = useStructureStore()
 
   const [createDialog, setCreateDialog] = useState(null)
   const [editDialog, setEditDialog] = useState(null)
@@ -309,6 +329,12 @@ export default function Overview() {
     mutationFn: async ({ type, id }) => {
       if (!supabase) throw new Error('Supabase not configured')
 
+      if (type === 'department') {
+        const res = await supabase.from('departments').delete().eq('id', id)
+        if (res.error) throw res.error
+        return { type, id }
+      }
+
       if (type === 'branch') {
         const res = await supabase.from('branches').delete().eq('id', id)
         if (res.error) throw res.error
@@ -335,10 +361,16 @@ export default function Overview() {
 
       throw new Error('Unknown type')
     },
-    onSuccess: () => {
+    onSuccess: ({ type, id }) => {
       queryClient.invalidateQueries({ queryKey: ['overviewStats'] })
       queryClient.invalidateQueries({ queryKey: ['overviewChildren'] })
+      // If we deleted the currently selected node, clear the selection
+      if (selectedNode?.id === id) {
+        clearSelection()
+      }
       setDeleteDialog(null)
+      // Refresh the tree when a node is deleted
+      triggerRefresh()
     },
   })
 
@@ -357,11 +389,49 @@ export default function Overview() {
     return <div className="text-sm text-muted-foreground">Select a node from the tree.</div>
   }
 
+  const handleRefresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['overviewStats'] })
+    queryClient.invalidateQueries({ queryKey: ['overviewChildren'] })
+  }
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-foreground">Overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Read-only summary for the current tree scope.</p>
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between bg-gradient-to-r from-primary/5 via-transparent to-transparent p-4 rounded-xl border border-border/50">
+        <div className="flex items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg">
+            <TrendingUp className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              {selectedNode?.name || 'Overview'}
+              <Sparkles className="h-5 w-5 text-primary/60" />
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {selectedNode?.type?.charAt(0).toUpperCase() + selectedNode?.type?.slice(1)} • Summary for the current tree scope
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={statsQuery.isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={cn("h-4 w-4", statsQuery.isFetching && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteDialog(selectedNode)}
+            className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
+        </div>
       </div>
 
       {statsQuery.error ? (
@@ -371,40 +441,45 @@ export default function Overview() {
         </Card>
       ) : null}
 
-      {statsQuery.isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> : null}
+      {statsQuery.isLoading ? (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          Loading statistics...
+        </div>
+      ) : null}
 
       {level === 'department' ? (
-        <div className="grid grid-responsive gap-4">
-          <StatCard label="Branches" value={stats.branchesCount} />
-          <StatCard label="Semesters" value={stats.semestersCount} helper="All semesters under this department" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard label="Branches" value={stats.branchesCount} icon={Layers} color="blue" />
+          <StatCard label="Semesters" value={stats.semestersCount} helper="All semesters under this department" icon={BookOpen} color="green" />
         </div>
       ) : null}
 
       {level === 'branch' ? (
-        <div className="grid grid-responsive gap-4">
-          <StatCard label="Semesters" value={stats.semestersCount} />
-          <StatCard label="Active Semesters" value={stats.activeSemestersCount} helper="Based on start/end date" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard label="Semesters" value={stats.semestersCount} icon={BookOpen} color="blue" />
+          <StatCard label="Active Semesters" value={stats.activeSemestersCount} helper="Based on start/end date" icon={TrendingUp} color="green" />
         </div>
       ) : null}
 
       {level === 'semester' ? (
-        <div className="grid grid-responsive gap-4">
-          <StatCard label="Classes" value={stats.classesCount} />
-          <StatCard label="Subjects" value={stats.subjectsCount} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard label="Classes" value={stats.classesCount} icon={Users} color="purple" />
+          <StatCard label="Subjects" value={stats.subjectsCount} icon={BookOpen} color="blue" />
         </div>
       ) : null}
 
       {level === 'class' ? (
-        <div className="grid grid-responsive gap-4">
-          <StatCard label="Batches" value={stats.batchesCount} />
-          <StatCard label="Assignments" value={stats.offeringsCount} helper="Total course offerings across this class's batches" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard label="Batches" value={stats.batchesCount} icon={Users} color="purple" />
+          <StatCard label="Assignments" value={stats.offeringsCount} helper="Total course offerings across this class's batches" icon={Layers} color="amber" />
         </div>
       ) : null}
 
       {level === 'batch' ? (
-        <div className="grid grid-responsive gap-4">
-          <StatCard label="Timetable Status" value={stats.timetableStatus} />
-          <StatCard label="Scope" value="Batch" helper="Scheduling is always batch-scoped" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard label="Timetable Status" value={stats.timetableStatus} icon={TrendingUp} color="green" />
+          <StatCard label="Scope" value="Batch" helper="Scheduling is always batch-scoped" icon={Users} color="blue" />
         </div>
       ) : null}
 

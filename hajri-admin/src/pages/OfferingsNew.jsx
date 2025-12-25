@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ThemedSelect, formatOptionLabel } from '@/components/ui/react-select-themed'
 import { supabase } from '@/lib/supabase'
 import { useScopeStore, useStructureStore } from '@/lib/store'
-import { AlertCircle, BookOpen, Check, GraduationCap, MapPin, Plus, Trash2, User, X, Loader2, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
+import { AlertCircle, BookOpen, Check, GraduationCap, MapPin, Plus, Trash2, User, X, Loader2, CheckCircle2, AlertTriangle, Info, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Navigate } from 'react-router-dom'
 
@@ -14,6 +14,8 @@ export default function OfferingsNew({ embedded = false }) {
   const { selectedNode } = useStructureStore()
   const { batchId } = useScopeStore()
   const [error, setError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const queryClient = useQueryClient()
 
   // Fetch batch and semester
   const { data: batchData } = useQuery({
@@ -93,7 +95,18 @@ export default function OfferingsNew({ embedded = false }) {
     enabled: !!batchId,
   })
 
-  const queryClient = useQueryClient()
+  // Refresh function
+  async function handleRefresh() {
+    setRefreshing(true)
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['offerings', batchId] })
+      await queryClient.invalidateQueries({ queryKey: ['subjects', semesterId] })
+      await queryClient.invalidateQueries({ queryKey: ['faculty'] })
+      await queryClient.invalidateQueries({ queryKey: ['rooms'] })
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   // Save/Update offering mutation
   const saveMutation = useMutation({
@@ -220,6 +233,15 @@ export default function OfferingsNew({ embedded = false }) {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="gap-2"
+          >
+            <RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+            Refresh
+          </Button>
           {stats.unassignedCount > 0 && (
             <Button 
               onClick={handleAutoAssign}
@@ -413,56 +435,41 @@ const SubjectOfferingCard = memo(function SubjectOfferingCard({ subject, offerin
         {editing ? (
           <div className="space-y-4">
             {/* Faculty Selection */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <GraduationCap className="h-4 w-4 text-primary" />
-                Assign Faculty *
-              </label>
-              <Select value={selectedFacultyId || 'none'} onValueChange={(val) => setSelectedFacultyId(val === 'none' ? '' : val)}>
-                <SelectTrigger className={cn(
-                  "h-11 border-2",
-                  !selectedFacultyId && "border-amber-500/50"
-                )}>
-                  <SelectValue placeholder="Select a faculty member..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">-- No faculty assigned --</SelectItem>
-                  {faculty.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{f.name}</span>
-                        {f.abbr && <span className="text-xs text-muted-foreground">({f.abbr})</span>}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ThemedSelect
+              label="Assign Faculty *"
+              icon={GraduationCap}
+              options={[
+                { value: '', label: '-- No faculty assigned --' },
+                ...faculty.map((f) => ({
+                  value: f.id,
+                  label: f.name,
+                  meta: f.abbr || '',
+                })),
+              ]}
+              value={selectedFacultyId}
+              onChange={setSelectedFacultyId}
+              placeholder="Search and select faculty..."
+              formatOptionLabel={formatOptionLabel}
+              isClearable
+              className={cn(!selectedFacultyId && "[&_.react-select__control]:border-amber-500/50")}
+            />
 
             {/* Room Selection */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" />
-                Default Room (Optional)
-              </label>
-              <Select value={selectedRoomId || 'none'} onValueChange={(val) => setSelectedRoomId(val === 'none' ? '' : val)}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="No default room" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">-- No default room --</SelectItem>
-                  {rooms.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      <div className="flex items-center gap-2">
-                        <span>Room {r.room_number}</span>
-                        {r.type && <span className="text-xs text-muted-foreground">({r.type})</span>}
-                        {r.capacity && <span className="text-xs text-muted-foreground">• Cap: {r.capacity}</span>}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ThemedSelect
+              label="Default Room (Optional)"
+              icon={MapPin}
+              options={[
+                { value: '', label: '-- No default room --' },
+                ...rooms.map((r) => ({
+                  value: r.id,
+                  label: `Room ${r.room_number}${r.type ? ` (${r.type})` : ''}${r.capacity ? ` • Cap: ${r.capacity}` : ''}`,
+                })),
+              ]}
+              value={selectedRoomId}
+              onChange={setSelectedRoomId}
+              placeholder="Search and select room..."
+              isClearable
+            />
 
             {/* Action Buttons */}
             <div className="flex gap-2 pt-2">
@@ -498,7 +505,7 @@ const SubjectOfferingCard = memo(function SubjectOfferingCard({ subject, offerin
             {/* Display Mode */}
             <div className="grid grid-form gap-4">
               <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
-                <GraduationCap className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <GraduationCap className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-muted-foreground mb-1">Faculty</div>
                   <div className="text-sm font-medium truncate">
@@ -510,7 +517,7 @@ const SubjectOfferingCard = memo(function SubjectOfferingCard({ subject, offerin
               </div>
 
               <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
-                <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <MapPin className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-semibold text-muted-foreground mb-1">Default Room</div>
                   <div className="text-sm font-medium truncate">

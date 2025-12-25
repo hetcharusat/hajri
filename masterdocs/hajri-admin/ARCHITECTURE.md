@@ -29,6 +29,8 @@
 - `hajri-admin/src/pages/OfferingsNew.jsx`
 - `hajri-admin/src/pages/TimetableNew.jsx`
 - `hajri-admin/src/pages/FacultyImproved.jsx`
+- `hajri-admin/src/pages/AcademicCalendar.jsx` ← Global scope calendar
+- `hajri-admin/src/lib/calendarUtils.js` ← Attendance engine helpers
 - `hajri-admin/src/components/AdminGuard.jsx`
 
 **Common pitfalls**

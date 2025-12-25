@@ -1,18 +1,113 @@
 import { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { 
+  DndContext, 
+  DragOverlay, 
+  useDraggable, 
+  useDroppable, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  pointerWithin,
+  rectIntersection,
+  MeasuringStrategy
+} from '@dnd-kit/core'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useScopeStore, useStructureStore } from '@/lib/store'
-import { AlertCircle, Eye, Save, Trash2, Edit2 } from 'lucide-react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { 
+  AlertCircle, 
+  Eye, 
+  Trash2, 
+  Edit2, 
+  RefreshCw, 
+  BookOpen, 
+  FlaskConical, 
+  GraduationCap,
+  Filter,
+  Layers,
+  Calendar,
+  Clock,
+  User,
+  MapPin,
+  Search,
+  X,
+  Check,
+  Save
+} from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+// Component type configuration
+const TYPE_CONFIG = {
+  LECTURE: {
+    color: 'bg-blue-500',
+    lightBg: 'bg-blue-500/10',
+    border: 'border-blue-500/30',
+    text: 'text-blue-500',
+    darkText: 'text-blue-400',
+    icon: BookOpen,
+    label: 'Lecture'
+  },
+  LAB: {
+    color: 'bg-purple-500',
+    lightBg: 'bg-purple-500/10',
+    border: 'border-purple-500/30',
+    text: 'text-purple-500',
+    darkText: 'text-purple-400',
+    icon: FlaskConical,
+    label: 'Lab'
+  },
+  TUTORIAL: {
+    color: 'bg-green-500',
+    lightBg: 'bg-green-500/10',
+    border: 'border-green-500/30',
+    text: 'text-green-500',
+    darkText: 'text-green-400',
+    icon: GraduationCap,
+    label: 'Tutorial'
+  }
+}
+
+// Animation variants
+const cardVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { type: 'spring', stiffness: 300, damping: 24 }
+  },
+  exit: { 
+    opacity: 0, 
+    scale: 0.9, 
+    transition: { duration: 0.2 } 
+  },
+  hover: {
+    scale: 1.03,
+    boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
+    transition: { type: 'spring', stiffness: 400, damping: 17 }
+  },
+  tap: { scale: 0.98 }
+}
+
+const dropZoneVariants = {
+  idle: { scale: 1, backgroundColor: 'transparent' },
+  active: { 
+    scale: 1.02, 
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    transition: { type: 'spring', stiffness: 300, damping: 20 }
+  }
+}
 
 function normalizeTimeString(value) {
   if (typeof value !== 'string') return ''
@@ -23,10 +118,7 @@ function normalizeTimeString(value) {
 }
 
 function newSlotId() {
-  return (
-    globalThis?.crypto?.randomUUID?.() ||
-    `slot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
-  )
+  return globalThis?.crypto?.randomUUID?.() || `slot_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 }
 
 function normalizeSlots(rawSlots) {
@@ -44,7 +136,6 @@ function normalizeSlots(rawSlots) {
 }
 
 function cellKey(dayIdx, startTime) {
-  // Use a delimiter that won't appear in time strings.
   return `${dayIdx}|${normalizeTimeString(startTime)}`
 }
 
@@ -53,108 +144,354 @@ function parseCellKey(key) {
   return { dayIdx: Number.parseInt(dayIdx, 10), startTime: normalizeTimeString(startTime) }
 }
 
-function DraggableOffering({ offering, isDragging }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: `offering-${offering.id}`,
-    data: { type: 'offering', offering },
-  })
-
-  const style = transform
-    ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        opacity: isDragging ? 0.5 : 1,
-      }
-    : undefined
-
-  return (
-    <button
-      ref={setNodeRef}
-      type="button"
-      className={cn(
-        'w-full min-w-[180px] rounded-lg border-2 border-border bg-card px-3 py-2.5 text-left transition-all duration-150',
-        'hover:border-primary hover:bg-secondary/70 hover:shadow-lg hover:scale-[1.03]',
-        'cursor-grab active:cursor-grabbing focus:outline-none focus:ring-2 focus:ring-primary',
-        'shadow-md',
-        isDragging && 'opacity-30 scale-90'
-      )}
-      {...listeners}
-      {...attributes}
-      style={style}
-    >
-      <div className="font-mono text-xs font-bold text-muted-foreground">{offering.subjects?.code || '—'}</div>
-      <div className="text-sm font-semibold text-foreground line-clamp-2 break-words">{offering.subjects?.name || '—'}</div>
-      <div className="text-xs text-muted-foreground truncate">
-        {offering.faculty?.name ? `👤 ${offering.faculty.name}` : '👤 TBA'}
-      </div>
-    </button>
-  )
+function formatTime(time) {
+  if (!time) return ''
+  const [h, m] = time.split(':').map(Number)
+  const period = h >= 12 ? 'PM' : 'AM'
+  const hour = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`
 }
 
-function DroppableCell({ cellId, event, isOver, children }) {
-  const { setNodeRef } = useDroppable({
-    id: cellId,
-    data: { type: 'cell', cellId },
-  })
-
+// Room Select Component - Simple select that works in dialogs
+function RoomSelectSimple({ rooms, value, onChange, placeholder = "Select room..." }) {
+  const [search, setSearch] = useState('')
+  
+  const filteredRooms = useMemo(() => {
+    if (!search) return rooms
+    const q = search.toLowerCase()
+    return rooms.filter(r => 
+      r.room_number?.toLowerCase().includes(q) || 
+      r.type?.toLowerCase().includes(q) ||
+      r.building?.toLowerCase().includes(q)
+    )
+  }, [rooms, search])
+  
+  const selectedRoom = rooms.find(r => r.id === value)
+  
   return (
-    <div
-      ref={setNodeRef}
-      data-droppable="true"
-      className={cn(
-        'min-h-[110px] w-full transition-all duration-150 rounded-lg p-1',
-        isOver && 'bg-primary/25 ring-4 ring-primary ring-inset shadow-2xl scale-[1.01]',
-        !event && 'hover:bg-accent/10'
+    <div className="space-y-3">
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search rooms..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 h-10 bg-background border-2 border-border focus:border-primary"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      
+      {/* Room List */}
+      <div className="max-h-[200px] overflow-y-auto rounded-lg border-2 border-border bg-background">
+        {/* No room option */}
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all hover:bg-accent",
+            !value && "bg-primary/10 border-l-2 border-primary"
+          )}
+        >
+          <div className={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full border-2",
+            !value ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"
+          )}>
+            {!value && <Check className="h-3 w-3" />}
+          </div>
+          <span className="text-muted-foreground italic">No room assigned</span>
+        </button>
+        
+        {filteredRooms.length === 0 ? (
+          <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+            No rooms found
+          </div>
+        ) : (
+          filteredRooms.map((room) => (
+            <button
+              key={room.id}
+              type="button"
+              onClick={() => onChange(room.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all hover:bg-accent border-t border-border/50",
+                value === room.id && "bg-primary/10 border-l-2 border-primary"
+              )}
+            >
+              <div className={cn(
+                "flex h-5 w-5 items-center justify-center rounded-full border-2",
+                value === room.id ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30"
+              )}>
+                {value === room.id && <Check className="h-3 w-3" />}
+              </div>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <MapPin className="h-4 w-4 text-primary shrink-0" />
+                <span className="font-medium truncate">{room.room_number}</span>
+                {room.type && (
+                  <Badge variant="outline" className="text-[10px] ml-auto shrink-0 bg-secondary">
+                    {room.type}
+                  </Badge>
+                )}
+              </div>
+              {room.capacity && (
+                <span className="text-xs text-muted-foreground">
+                  {room.capacity} seats
+                </span>
+              )}
+            </button>
+          ))
+        )}
+      </div>
+      
+      {/* Selected indicator */}
+      {selectedRoom && (
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/10 border border-primary/20">
+          <Check className="h-4 w-4 text-primary" />
+          <span className="text-sm">
+            Selected: <strong>{selectedRoom.room_number}</strong>
+          </span>
+        </div>
       )}
-    >
-      {children}
     </div>
   )
 }
 
+// Draggable offering card with type indicator
+function DraggableOffering({ offering, isDragging, index }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging: dragging } = useDraggable({
+    id: `offering-${offering.id}`,
+    data: { type: 'offering', offering },
+  })
+
+  const componentType = offering.subjects?.type || 'LECTURE'
+  const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
+  const TypeIcon = config.icon
+
+  return (
+    <motion.div
+      ref={setNodeRef}
+      variants={cardVariants}
+      initial="hidden"
+      animate={dragging ? "tap" : "visible"}
+      whileHover={!dragging ? "hover" : undefined}
+      whileTap="tap"
+      custom={index}
+      className={cn(
+        'rounded-xl border-2 p-3 transition-colors cursor-grab active:cursor-grabbing select-none',
+        config.lightBg,
+        config.border,
+        dragging && 'opacity-50 scale-95 shadow-2xl z-50'
+      )}
+      style={{
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+      }}
+      {...listeners}
+      {...attributes}
+    >
+      {/* Type Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <motion.div 
+            className={cn("p-1.5 rounded-lg", config.color)}
+            whileHover={{ scale: 1.1, rotate: 5 }}
+          >
+            <TypeIcon className="h-3.5 w-3.5 text-white" />
+          </motion.div>
+          <Badge className={cn("text-[10px] font-bold uppercase", config.color, "text-white border-0")}>
+            {componentType}
+          </Badge>
+        </div>
+      </div>
+      
+      {/* Subject Info */}
+      <div className="font-mono text-xs font-bold text-foreground">{offering.subjects?.code || '—'}</div>
+      <div className="text-sm font-medium text-foreground line-clamp-2 mt-0.5">{offering.subjects?.name || '—'}</div>
+      
+      {/* Faculty */}
+      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+        <User className="h-3 w-3 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground truncate">
+          {offering.faculty?.name || 'TBA'}
+        </span>
+      </div>
+    </motion.div>
+  )
+}
+
+// Droppable cell with animation - ALWAYS droppable even when has event
+function DroppableCell({ cellId, isOver, hasEvent, children }) {
+  const { setNodeRef, isOver: dropping, active } = useDroppable({
+    id: cellId,
+    data: { type: 'cell', cellId },
+    // Don't disable - we handle conflicts in handleDragEnd
+  })
+
+  const isActive = isOver || dropping
+  const showDropIndicator = isActive && active // Only show when actively dragging
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'min-h-[100px] w-full rounded-lg p-1 relative transition-all duration-200',
+        showDropIndicator && !hasEvent && 'ring-4 ring-primary/50 ring-inset bg-primary/10 shadow-xl scale-[1.02]',
+        showDropIndicator && hasEvent && 'ring-4 ring-destructive/50 ring-inset bg-destructive/10',
+        !hasEvent && !isActive && 'hover:bg-accent/5'
+      )}
+      style={{ touchAction: 'none' }}
+    >
+      {children}
+      {/* Drop indicator overlay */}
+      {showDropIndicator && !hasEvent && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-bold shadow-lg"
+          >
+            ✓ Drop here
+          </motion.div>
+        </div>
+      )}
+      {showDropIndicator && hasEvent && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-destructive text-destructive-foreground px-3 py-1.5 rounded-full text-xs font-bold shadow-lg"
+          >
+            ✗ Occupied
+          </motion.div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Timetable block with type indicator and animation
 function TimetableBlock({ event, onEdit, onDelete, viewMode }) {
   const off = event.course_offerings
   const code = off?.subjects?.code
   const name = off?.subjects?.name
   const facultyName = off?.faculty?.name
   const roomNum = event.rooms?.room_number
-  const subjectType = off?.subjects?.type || 'LECTURE'
-
-  const typeColors = {
-    LECTURE: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-    LAB: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
-    TUTORIAL: 'bg-green-500/10 border-green-500/30 text-green-400',
-  }
-
-  const colorClass = typeColors[subjectType] || typeColors.LECTURE
+  const componentType = off?.subjects?.type || 'LECTURE'
+  
+  const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
+  const TypeIcon = config.icon
 
   return (
-    <div className={cn('group relative rounded-lg border-2 p-2 shadow-md hover:shadow-xl transition-all duration-150 h-full min-h-[100px] flex flex-col', colorClass)}>
-      <div className="font-mono text-[11px] font-bold opacity-95">{code || '—'}</div>
-      <div className="text-xs font-semibold leading-tight mt-1 line-clamp-2 break-words flex-1">{name || '—'}</div>
-      <div className="text-[10px] opacity-80 mt-1 truncate">👤 {facultyName || 'TBA'}</div>
-      <div className="text-[10px] opacity-80 truncate">📍 {roomNum || 'No room'}</div>
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      className={cn(
+        'group relative rounded-xl border-2 p-2.5 shadow-md h-full min-h-[95px] flex flex-col',
+        config.lightBg,
+        config.border
+      )}
+    >
+      {/* Type indicator */}
+      <div className="flex items-center gap-1.5 mb-1">
+        <motion.div 
+          className={cn("p-1 rounded", config.color)}
+          whileHover={{ scale: 1.1 }}
+        >
+          <TypeIcon className="h-3 w-3 text-white" />
+        </motion.div>
+        <span className={cn("text-[10px] font-bold uppercase", config.darkText)}>{componentType}</span>
+      </div>
+      
+      <div className={cn("font-mono text-xs font-bold", config.darkText)}>{code || '—'}</div>
+      <div className="text-xs font-semibold leading-tight mt-0.5 line-clamp-2 flex-1">{name || '—'}</div>
+      
+      <div className="mt-auto pt-1 space-y-0.5">
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <User className="h-2.5 w-2.5" />
+          <span className="truncate">{facultyName || 'TBA'}</span>
+        </div>
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <MapPin className="h-2.5 w-2.5" />
+          <span>{roomNum || 'No room'}</span>
+        </div>
+      </div>
 
       {viewMode === 'draft' && (
-        <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
+        <motion.div 
+          className="absolute top-1 right-1 flex gap-0.5"
+          initial={{ opacity: 0 }}
+          whileHover={{ opacity: 1 }}
+        >
+          <motion.button
             type="button"
             onClick={() => onEdit(event)}
-            className="rounded bg-background/90 p-1 hover:bg-secondary"
-            title="Edit room/faculty"
+            className="rounded-full bg-background/90 p-1.5 hover:bg-secondary shadow-sm"
+            title="Edit"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
           >
             <Edit2 className="h-3 w-3" />
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             type="button"
             onClick={() => onDelete(event.id)}
-            className="rounded bg-background/90 p-1 hover:bg-destructive/20 text-destructive"
+            className="rounded-full bg-destructive text-white p-1.5 hover:bg-destructive/80 shadow-sm"
             title="Delete"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
           >
             <Trash2 className="h-3 w-3" />
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
+  )
+}
+
+// Drag overlay component for smooth following
+function DragOverlayContent({ offering }) {
+  if (!offering) return null
+  
+  const componentType = offering.subjects?.type || 'LECTURE'
+  const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
+  const TypeIcon = config.icon
+
+  return (
+    <motion.div
+      initial={{ scale: 0.8, opacity: 0, rotate: -5 }}
+      animate={{ scale: 1.05, opacity: 1, rotate: 3 }}
+      className={cn(
+        'rounded-xl border-2 p-3 shadow-2xl cursor-grabbing w-48',
+        config.lightBg,
+        config.border,
+        'ring-4 ring-primary/30'
+      )}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <div className={cn("p-1.5 rounded-lg", config.color)}>
+          <TypeIcon className="h-3.5 w-3.5 text-white" />
+        </div>
+        <Badge className={cn("text-[10px] font-bold uppercase", config.color, "text-white border-0")}>
+          {componentType}
+        </Badge>
+      </div>
+      <div className="font-mono text-xs font-bold text-foreground">{offering.subjects?.code || '—'}</div>
+      <div className="text-sm font-medium text-foreground line-clamp-2 mt-0.5">{offering.subjects?.name || '—'}</div>
+      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+        <User className="h-3 w-3 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground truncate">{offering.faculty?.name || 'TBA'}</span>
+      </div>
+    </motion.div>
   )
 }
 
@@ -165,29 +502,71 @@ export default function TimetableNew() {
 
   const [viewMode, setViewMode] = useState('draft')
   const [error, setError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('ALL')
 
   const [activeId, setActiveId] = useState(null)
   const [overId, setOverId] = useState(null)
 
   const [editDialog, setEditDialog] = useState(null)
   const [roomPickDialog, setRoomPickDialog] = useState(null)
+  const [selectedRoomId, setSelectedRoomId] = useState(null)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 3,
-      },
-    })
-  )
+  // Better sensors for smoother drag
+  // Use only PointerSensor with minimal distance for responsive drag
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 8, // Small distance to start drag
+    },
+  })
+
+  const sensors = useSensors(pointerSensor)
+
+  // Custom collision detection that prefers empty cells
+  const customCollisionDetection = (args) => {
+    // First try pointerWithin for precise detection
+    const pointerCollisions = pointerWithin(args)
+    
+    if (pointerCollisions.length > 0) {
+      // Filter to only cell droppables (not the draggable items)
+      const cellCollisions = pointerCollisions.filter(c => 
+        typeof c.id === 'string' && c.id.includes('|')
+      )
+      if (cellCollisions.length > 0) {
+        return cellCollisions
+      }
+    }
+    
+    // Fallback to rectIntersection
+    const rectCollisions = rectIntersection(args)
+    return rectCollisions.filter(c => 
+      typeof c.id === 'string' && c.id.includes('|')
+    )
+  }
+
+  // Refresh function
+  async function handleRefresh() {
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['rooms'] }),
+        queryClient.invalidateQueries({ queryKey: ['activePeriodTemplate'] }),
+        queryClient.invalidateQueries({ queryKey: ['courseOfferings'] }),
+        queryClient.invalidateQueries({ queryKey: ['timetableEvents'] }),
+        queryClient.invalidateQueries({ queryKey: ['timetableWorkspace'] }),
+      ])
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const roomsQuery = useQuery({
     queryKey: ['rooms', { departmentId }],
     queryFn: async () => {
       if (!supabase) throw new Error('Supabase not configured')
       let query = supabase.from('rooms').select('*')
-      if (departmentId) {
-        query = query.eq('department_id', departmentId)
-      }
+      if (departmentId) query = query.eq('department_id', departmentId)
       const { data, error } = await query.order('room_number')
       if (error) throw error
       return data || []
@@ -210,8 +589,6 @@ export default function TimetableNew() {
       return data || null
     },
   })
-
-  const templateId = activeTemplateQuery.data?.id || null
 
   const periods = useMemo(() => normalizeSlots(activeTemplateQuery.data?.slots), [activeTemplateQuery.data?.slots])
 
@@ -308,11 +685,40 @@ export default function TimetableNew() {
   const offerings = offeringsQuery.data || []
   const events = eventsQuery.data || []
 
+  // Filter offerings
+  const filteredOfferings = useMemo(() => {
+    let filtered = offerings
+    
+    // Filter by type
+    if (typeFilter !== 'ALL') {
+      filtered = filtered.filter(o => (o.subjects?.type || 'LECTURE') === typeFilter)
+    }
+    
+    // Filter by search
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      filtered = filtered.filter(o => {
+        const text = `${o.subjects?.code || ''} ${o.subjects?.name || ''} ${o.faculty?.name || ''} ${o.subjects?.type || ''}`.toLowerCase()
+        return text.includes(q)
+      })
+    }
+    
+    return filtered
+  }, [offerings, typeFilter, searchQuery])
+
+  // Type counts
+  const typeCounts = useMemo(() => ({
+    ALL: offerings.length,
+    LECTURE: offerings.filter(o => (o.subjects?.type || 'LECTURE') === 'LECTURE').length,
+    LAB: offerings.filter(o => o.subjects?.type === 'LAB').length,
+    TUTORIAL: offerings.filter(o => o.subjects?.type === 'TUTORIAL').length,
+  }), [offerings])
+
   const templateReady = Boolean(activeTemplateQuery.data) && periods.length > 0
   const blockEditingReason = !activeTemplateQuery.data
     ? 'No period template exists. Create one in Period Templates first.'
     : periods.length === 0
-      ? 'Active period template has no periods. Add periods in Period Templates first.'
+      ? 'Active period template has no periods. Add periods first.'
       : null
 
   const placeEventMutation = useMutation({
@@ -323,26 +729,21 @@ export default function TimetableNew() {
       const normalizedStart = normalizeTimeString(startTime)
       const normalizedEnd = normalizeTimeString(endTime)
 
-      // Ensure the slot is unique by (version_id, day_of_week, start_time)
-      const delByTime = await supabase
+      await supabase
         .from('timetable_events')
         .delete()
         .eq('version_id', versionId)
         .eq('day_of_week', dayIdx)
         .eq('start_time', normalizedStart)
 
-      if (delByTime.error) throw delByTime.error
-
-      const ins = await supabase.from('timetable_events').insert([
-        {
-          version_id: versionId,
-          offering_id: offeringId,
-          day_of_week: dayIdx,
-          start_time: normalizedStart,
-          end_time: normalizedEnd,
-          room_id: roomId || null,
-        },
-      ])
+      const ins = await supabase.from('timetable_events').insert([{
+        version_id: versionId,
+        offering_id: offeringId,
+        day_of_week: dayIdx,
+        start_time: normalizedStart,
+        end_time: normalizedEnd,
+        room_id: roomId || null,
+      }])
 
       if (ins.error) throw ins.error
     },
@@ -414,15 +815,11 @@ export default function TimetableNew() {
     onError: (e) => setError(e?.message || 'Failed to publish draft'),
   })
 
-  const busy =
-    roomsQuery.isFetching ||
-    activeTemplateQuery.isFetching ||
-    offeringsQuery.isFetching ||
-    eventsQuery.isFetching ||
-    placeEventMutation.isLoading ||
-    deleteEventMutation.isLoading ||
-    updateEventRoomMutation.isLoading ||
-    publishDraftMutation.isLoading
+  const busy = refreshing ||
+    placeEventMutation.isPending ||
+    deleteEventMutation.isPending ||
+    updateEventRoomMutation.isPending ||
+    publishDraftMutation.isPending
 
   const loading =
     roomsQuery.isLoading ||
@@ -431,21 +828,31 @@ export default function TimetableNew() {
     offeringsQuery.isLoading ||
     eventsQuery.isLoading
 
+  function handleDragStart(event) {
+    setActiveId(event.active.id)
+    setError('')
+  }
+
+  function handleDragOver(event) {
+    setOverId(event.over?.id || null)
+  }
+
   async function handleDragEnd(event) {
     const { active, over } = event
     setActiveId(null)
     setOverId(null)
 
     if (!over || viewMode === 'published') return
-    if (!batchId) return
-    if (!templateReady) {
+    if (!batchId || !templateReady || !activeVersionId) {
       setError(blockEditingReason || 'Period template required')
       return
     }
-    if (!activeVersionId) return
 
     const offeringData = active.data.current?.offering
     if (!offeringData) return
+
+    // Check if dropped on a valid cell
+    if (typeof over.id !== 'string' || !over.id.includes('|')) return
 
     const { dayIdx, startTime } = parseCellKey(over.id)
     const period = periodByStartTime.get(normalizeTimeString(startTime))
@@ -460,59 +867,41 @@ export default function TimetableNew() {
     )
 
     if (conflictingEvent) {
-      setError(`Conflict: slot already occupied by ${conflictingEvent.course_offerings?.subjects?.code || 'another offering'}`)
+      setError(`Slot already occupied by ${conflictingEvent.course_offerings?.subjects?.code || 'another offering'}`)
       return
     }
 
+    // Reset selected room and open dialog
+    setSelectedRoomId(offeringData.default_room_id || null)
     setRoomPickDialog({
       offeringId: offeringData.id,
+      offeringName: offeringData.subjects?.name,
+      offeringCode: offeringData.subjects?.code,
+      offeringType: offeringData.subjects?.type || 'LECTURE',
       dayIdx,
+      dayName: DAYS[dayIdx],
+      periodName: period.name,
       startTime: period.start_time,
       endTime: period.end_time,
     })
   }
 
-  async function saveWithRoom(roomId) {
-    if (!roomPickDialog) return
-    if (!activeVersionId) return
+  function handleDragCancel() {
+    setActiveId(null)
+    setOverId(null)
+  }
+
+  async function saveWithRoom() {
+    if (!roomPickDialog || !activeVersionId) return
     const { offeringId, dayIdx, startTime, endTime } = roomPickDialog
-    const normalizedStart = normalizeTimeString(startTime)
-
-    const facultyConflict = events.find(
-      (e) =>
-        e.day_of_week === dayIdx &&
-        normalizeTimeString(e.start_time) === normalizedStart &&
-        e.course_offerings?.faculty_id === offerings.find((o) => o.id === offeringId)?.faculty_id
-    )
-
-    if (facultyConflict) {
-      setError('Conflict: faculty is already assigned to another offering at this time')
-      return
-    }
-
-    if (roomId) {
-      const roomConflict = events.find(
-        (e) => e.day_of_week === dayIdx && normalizeTimeString(e.start_time) === normalizedStart && e.room_id === roomId
-      )
-      if (roomConflict) {
-        setError('Conflict: room is already occupied at this time')
-        return
-      }
-    }
 
     setError('')
     placeEventMutation.mutate(
-      {
-        versionId: activeVersionId,
-        offeringId,
-        dayIdx,
-        startTime,
-        endTime,
-        roomId: roomId || null,
-      },
-      {
-        onSuccess: () => setRoomPickDialog(null),
-      }
+      { versionId: activeVersionId, offeringId, dayIdx, startTime, endTime, roomId: selectedRoomId || null },
+      { onSuccess: () => {
+        setRoomPickDialog(null)
+        setSelectedRoomId(null)
+      }}
     )
   }
 
@@ -523,34 +912,8 @@ export default function TimetableNew() {
     deleteEventMutation.mutate({ versionId: activeVersionId, eventId })
   }
 
-  async function handleEditSave(eventId, facultyId, roomId) {
-    const normalizedStart = normalizeTimeString(editDialog?.event?.start_time)
-    const roomConflict = events.find(
-      (e) =>
-        e.id !== eventId &&
-        e.day_of_week === editDialog.event.day_of_week &&
-        normalizeTimeString(e.start_time) === normalizedStart &&
-        e.room_id === roomId
-    )
-    if (roomConflict) {
-      setError('Room conflict: room is already occupied at this time')
-      return
-    }
-
-    const facultyConflict = events.find(
-      (e) =>
-        e.id !== eventId &&
-        e.day_of_week === editDialog.event.day_of_week &&
-        normalizeTimeString(e.start_time) === normalizedStart &&
-        e.course_offerings?.faculty_id === facultyId
-    )
-    if (facultyConflict) {
-      setError('Faculty conflict: faculty is already assigned at this time')
-      return
-    }
-
+  async function handleEditSave(eventId, roomId) {
     if (!activeVersionId) return
-
     setError('')
     updateEventRoomMutation.mutate(
       { versionId: activeVersionId, eventId, roomId: roomId || null },
@@ -560,13 +923,28 @@ export default function TimetableNew() {
 
   async function publishDraft() {
     if (!batchId || !draftVersionId) return
-    if (!confirm('Publish this draft timetable? Existing published version will be archived.')) return
+    if (!confirm('Publish this draft? Existing published version will be archived.')) return
     setError('')
     publishDraftMutation.mutate({ batchId, draftVersionId })
   }
 
   if (loading) {
-    return <div className="py-12 text-sm text-muted-foreground">Loading timetable…</div>
+    return (
+      <div className="flex items-center justify-center h-64">
+        <motion.div 
+          className="text-center space-y-3"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <motion.div 
+            className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent mx-auto"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          />
+          <p className="text-sm text-muted-foreground">Loading timetable...</p>
+        </motion.div>
+      </div>
+    )
   }
 
   if (!selectedNode || !batchId) {
@@ -585,132 +963,254 @@ export default function TimetableNew() {
   return (
     <>
       <DndContext
-      sensors={sensors}
-      onDragStart={(e) => {
-        setActiveId(e.active.id)
-        setError('')
-      }}
-      onDragOver={(e) => setOverId(e.over?.id || null)}
-      onDragEnd={handleDragEnd}
-      onDragCancel={() => {
-        setActiveId(null)
-        setOverId(null)
-      }}
-    >
-      <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Class Timetable</h1>
-            <p className="text-muted-foreground">
-              {batchId ? 'Drag offerings to schedule' : 'Select a batch from the tree to begin'}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === 'draft' ? 'default' : 'outline'}
-              onClick={() => setViewMode('draft')}
-              disabled={busy}
-            >
-              Draft
-            </Button>
-            <Button
-              variant={viewMode === 'published' ? 'default' : 'outline'}
-              onClick={() => setViewMode('published')}
-              disabled={busy || !publishedVersionId}
-              title={!publishedVersionId ? 'No published timetable yet' : ''}
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              Published
-            </Button>
-            <Button onClick={publishDraft} disabled={busy || viewMode !== 'draft' || !batchId || !templateReady}>
-              <Save className="mr-2 h-4 w-4" />
-              Publish
-            </Button>
-          </div>
-        </div>
-
-        {!batchId && (
-          <div className="flex items-start gap-3 rounded-lg border-2 border-border bg-muted/30 p-6">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">Batch scope required</p>
-              <p className="text-sm text-muted-foreground">
-                Select a Batch node in the Tree Explorer to edit a timetable.
-              </p>
+        sensors={sensors}
+        collisionDetection={customCollisionDetection}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+        measuring={{
+          droppable: {
+            strategy: MeasuringStrategy.Always,
+          },
+        }}
+      >
+        <motion.div 
+          className="space-y-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          {/* Header */}
+          <motion.div 
+            className="flex items-center justify-between"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <div className="flex items-center gap-4">
+              <motion.div 
+                className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
+                whileHover={{ scale: 1.05, rotate: 5 }}
+              >
+                <Calendar className="h-6 w-6 text-white" />
+              </motion.div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  Class Timetable
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {offerings.length} offerings • Drag to schedule
+                </p>
+              </div>
             </div>
-          </div>
-        )}
 
-        {error && (
-          <div className="flex items-start gap-3 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">Error</p>
-              <p className="text-sm text-muted-foreground">{error}</p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={busy || refreshing}
+                className="gap-2"
+              >
+                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+                Refresh
+              </Button>
+              <div className="h-6 w-px bg-border" />
+              <Button
+                variant={viewMode === 'draft' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('draft')}
+                disabled={busy}
+              >
+                Draft
+              </Button>
+              <Button
+                variant={viewMode === 'published' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('published')}
+                disabled={busy || !publishedVersionId}
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Published
+              </Button>
+              <Button 
+                size="sm"
+                onClick={publishDraft} 
+                disabled={busy || viewMode !== 'draft' || !templateReady}
+                className="shadow-md"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Publish
+              </Button>
             </div>
-          </div>
-        )}
+          </motion.div>
 
-        {batchId && blockEditingReason && (
-          <div className="flex items-start gap-3 rounded-lg border-2 border-border bg-muted/30 p-6">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">Period template required</p>
-              <p className="text-sm text-muted-foreground">{blockEditingReason}</p>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          {/* Available Offerings - Top */}
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="text-xl">Available Offerings</CardTitle>
-              <CardDescription>Drag any offering to schedule it in the timetable below</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!batchId ? (
-                <div className="text-sm text-muted-foreground">Select a batch to load offerings.</div>
-              ) : offerings.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
-                  No offerings for this batch. Create them in Assignments first.
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div 
+                className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-destructive">Error</p>
+                  <p className="text-sm text-muted-foreground">{error}</p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[300px] overflow-y-auto p-2">
-                  {offerings.map((o) => (
-                    <DraggableOffering key={o.id} offering={o} isDragging={activeId === `offering-${o.id}`} />
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                <button onClick={() => setError('')}><X className="h-4 w-4" /></button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Timetable Grid - Bottom */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Weekly Timetable Grid</CardTitle>
-              <CardDescription>{viewMode === 'published' ? 'Published (read-only)' : 'Draft - Drag offerings into slots'}</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {!templateReady ? (
-                  <div className="rounded-lg border-2 border-border bg-muted/20 p-6 text-sm text-foreground">
-                    {blockEditingReason || 'Period template required to render the grid.'}
+          {/* Template Warning */}
+          <AnimatePresence>
+            {blockEditingReason && (
+              <motion.div 
+                className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold">Period template required</p>
+                  <p className="text-sm text-muted-foreground">{blockEditingReason}</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Offerings Panel with Type Filters */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="border-2">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-lg">Available Offerings</CardTitle>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    {/* Type Filter Tabs */}
+                    <div className="flex items-center bg-muted rounded-lg p-1 gap-1">
+                      {[
+                        { key: 'ALL', label: 'All', icon: Layers, color: '' },
+                        { key: 'LECTURE', label: 'Lectures', icon: BookOpen, color: 'bg-blue-500' },
+                        { key: 'LAB', label: 'Labs', icon: FlaskConical, color: 'bg-purple-500' },
+                        { key: 'TUTORIAL', label: 'Tutorials', icon: GraduationCap, color: 'bg-green-500' },
+                      ].filter(t => t.key === 'ALL' || t.key === 'LECTURE' || t.key === 'LAB' || (t.key === 'TUTORIAL' && typeCounts.TUTORIAL > 0))
+                        .map(({ key, label, icon: Icon, color }) => (
+                        <motion.button
+                          key={key}
+                          onClick={() => setTypeFilter(key)}
+                          className={cn(
+                            "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
+                            typeFilter === key 
+                              ? key === 'ALL' 
+                                ? 'bg-background shadow-sm text-foreground' 
+                                : `${color} text-white shadow-sm`
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {label} ({typeCounts[key]})
+                        </motion.button>
+                      ))}
+                    </div>
+                    
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        className="w-56 h-8 text-sm pl-9"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search offerings..."
+                        disabled={viewMode === 'published'}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <CardDescription>Drag any offering to schedule it in the timetable below</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {offerings.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-8 text-center">
+                    No offerings for this batch. Create them in Assignments first.
+                  </div>
+                ) : filteredOfferings.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-8 text-center">
+                    No offerings match your filter.
                   </div>
                 ) : (
-                  <div className="overflow-x-auto border-2 border-border rounded-xl shadow-xl">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[280px] overflow-y-auto p-1">
+                    <AnimatePresence mode="popLayout">
+                      {filteredOfferings.map((o, idx) => (
+                        <DraggableOffering 
+                          key={o.id} 
+                          offering={o} 
+                          isDragging={activeId === `offering-${o.id}`}
+                          index={idx}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Timetable Grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="border-2">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-muted-foreground" />
+                      Weekly Timetable Grid
+                    </CardTitle>
+                    <CardDescription>
+                      {viewMode === 'published' ? 'Published (read-only)' : 'Draft - Drag offerings into slots'}
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!templateReady ? (
+                  <div className="rounded-lg border-2 border-dashed border-border bg-muted/20 p-12 text-center">
+                    <Clock className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                    <p className="font-medium">Period template required</p>
+                    <p className="text-sm text-muted-foreground mt-1">{blockEditingReason}</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border-2 border-border rounded-xl">
                     <table className="w-full border-collapse min-w-[1200px]">
                       <thead>
                         <tr>
-                          <th className="border-r-2 border-b-2 border-border bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-foreground w-32 sticky left-0 z-10 shadow-md">
-                            Period
+                          <th className="border-r-2 border-b-2 border-border bg-muted/50 px-4 py-3 text-left text-sm font-semibold w-36 sticky left-0 z-10">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              Period
+                            </div>
                           </th>
-                          {DAYS.map((day) => (
-                            <th
-                              key={day}
-                              className="border-r-2 border-b-2 border-border bg-muted/70 px-3 py-3 text-center text-sm font-bold min-w-[180px] w-[180px]"
-                            >
-                              {day}
+                          {DAYS.map((day, idx) => (
+                            <th key={day} className="border-r-2 border-b-2 border-border bg-muted/50 px-3 py-3 text-center min-w-[170px]">
+                              <div className="text-xs text-muted-foreground">{DAY_ABBR[idx]}</div>
+                              <div className="text-sm font-semibold">{day}</div>
                             </th>
                           ))}
                         </tr>
@@ -718,16 +1218,16 @@ export default function TimetableNew() {
                       <tbody>
                         {periods.map((period) => (
                           <tr key={period.id}>
-                            <td className="border-r-2 border-b-2 border-border bg-muted/40 px-4 py-3 align-top sticky left-0 z-10 shadow-md">
-                              <div className="text-sm font-bold text-foreground whitespace-nowrap">
-                                {typeof period.period_number === 'number' ? `P${period.period_number}` : 'Period'}
+                            <td className="border-r-2 border-b-2 border-border bg-muted/30 px-4 py-3 align-top sticky left-0 z-10">
+                              <div className="text-sm font-bold">{period.name}</div>
+                              <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                                {formatTime(period.start_time)} - {formatTime(period.end_time)}
                               </div>
-                              <div className="text-[11px] text-muted-foreground whitespace-nowrap font-mono mt-1">
-                                {period.start_time.slice(0,5)}-{period.end_time.slice(0,5)}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground whitespace-nowrap mt-0.5">
-                                {period.is_break ? '☕ BREAK' : period.name}
-                              </div>
+                              {period.is_break && (
+                                <Badge variant="secondary" className="mt-1 bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]">
+                                  Break
+                                </Badge>
+                              )}
                             </td>
                             {DAYS.map((_, dayIdx) => {
                               const key = cellKey(dayIdx, period.start_time)
@@ -735,25 +1235,35 @@ export default function TimetableNew() {
                               const isOver = overId === key
 
                               return (
-                                <td key={dayIdx} className="border-r-2 border-b-2 border-border p-2 align-top min-w-[180px] w-[180px] bg-background">
+                                <td key={dayIdx} className="border-r-2 border-b-2 border-border p-1.5 align-top min-w-[170px] bg-background">
                                   {period.is_break ? (
-                                    <div className="h-[110px] flex items-center justify-center rounded-lg bg-amber-100/50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-700 text-sm font-bold text-amber-800 dark:text-amber-300 shadow-sm">
-                                      ☕ BREAK
+                                    <div className="h-[100px] flex items-center justify-center rounded-xl bg-amber-500/10 border-2 border-amber-500/30 text-sm font-bold text-amber-600">
+                                      ☕ Break
                                     </div>
                                   ) : (
-                                    <DroppableCell cellId={key} event={ev} isOver={isOver}>
-                                      {ev ? (
-                                        <TimetableBlock
-                                          event={ev}
-                                          viewMode={viewMode}
-                                          onEdit={(e) => setEditDialog({ event: e })}
-                                          onDelete={handleDelete}
-                                        />
-                                      ) : (
-                                        <div className="h-[110px] flex items-center justify-center text-xs font-medium text-muted-foreground border-2 border-dashed border-border/40 rounded-lg hover:border-primary/50 hover:bg-accent/5 transition-all">
-                                          {viewMode === 'draft' ? '➕ Drop Here' : '—'}
-                                        </div>
-                                      )}
+                                    <DroppableCell cellId={key} isOver={isOver} hasEvent={Boolean(ev)}>
+                                      <AnimatePresence mode="wait">
+                                        {ev ? (
+                                          <div className="pointer-events-auto">
+                                            <TimetableBlock
+                                              key={ev.id}
+                                              event={ev}
+                                              viewMode={viewMode}
+                                              onEdit={(e) => setEditDialog({ event: e })}
+                                              onDelete={handleDelete}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <motion.div 
+                                            key="empty"
+                                            className="h-[100px] flex items-center justify-center text-xs border-2 border-dashed rounded-xl border-border/50 text-muted-foreground/50"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                          >
+                                            {viewMode === 'draft' ? 'Drop here' : '—'}
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
                                     </DroppableCell>
                                   )}
                                 </td>
@@ -765,87 +1275,123 @@ export default function TimetableNew() {
                     </table>
                   </div>
                 )}
-                
-                {viewMode === 'draft' && (
-                  <div className="mt-3 text-xs text-muted-foreground">
-                    💡 Tip: Drag an offering from above into any time slot. A room picker will appear.
-                  </div>
-                )}
               </CardContent>
             </Card>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
-        <DragOverlay>
-          {activeOffering ? (
-            <div className="rounded-xl border-4 border-primary bg-card px-4 py-3 shadow-2xl opacity-90 rotate-3 scale-110 min-w-[180px]">
-              <div className="font-mono text-sm font-bold text-primary">{activeOffering.subjects?.code || '—'}</div>
-              <div className="text-base font-bold text-foreground mt-1 line-clamp-2">{activeOffering.subjects?.name || '—'}</div>
-              <div className="text-xs text-muted-foreground mt-1">👤 {activeOffering.faculty?.name || 'TBA'}</div>
-            </div>
-          ) : null}
+        {/* Drag Overlay - follows cursor smoothly */}
+        <DragOverlay dropAnimation={{
+          duration: 250,
+          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
+        }}>
+          <DragOverlayContent offering={activeOffering} />
         </DragOverlay>
       </DndContext>
 
-      {/* Room Picker Dialog */}
-      <Dialog open={Boolean(roomPickDialog)} onOpenChange={(open) => !open && setRoomPickDialog(null)}>
-        <DialogContent>
+      {/* Room Picker Dialog - Searchable */}
+      <Dialog open={Boolean(roomPickDialog)} onOpenChange={(open) => {
+        if (!open) {
+          setRoomPickDialog(null)
+          setSelectedRoomId(null)
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Select Room</DialogTitle>
-            <DialogDescription>Choose a room for this time slot (optional)</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" />
+              Select Room
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                {roomPickDialog && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge className={cn(
+                      "text-xs",
+                      TYPE_CONFIG[roomPickDialog.offeringType]?.color,
+                      "text-white border-0"
+                    )}>
+                      {roomPickDialog.offeringType}
+                    </Badge>
+                    <span className="font-mono font-bold">{roomPickDialog.offeringCode}</span>
+                  </div>
+                )}
+                <div className="text-sm">
+                  Scheduling for <strong>{roomPickDialog?.dayName}</strong>, <strong>{roomPickDialog?.periodName}</strong>
+                  <span className="text-muted-foreground ml-1">
+                    ({formatTime(roomPickDialog?.startTime)} - {formatTime(roomPickDialog?.endTime)})
+                  </span>
+                </div>
+              </div>
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          
+          <div className="space-y-4 pt-4">
             <div>
-              <Label htmlFor="room-select">Room</Label>
-              <Select onValueChange={(val) => saveWithRoom(val === 'none' ? null : val)}>
-                <SelectTrigger id="room-select">
-                  <SelectValue placeholder="Select room (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No room</SelectItem>
-                  {rooms.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.room_number}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-sm font-medium mb-2 block">Room Assignment</Label>
+              <RoomSelectSimple
+                rooms={rooms}
+                value={selectedRoomId}
+                onChange={setSelectedRoomId}
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                You can leave this empty and assign a room later
+              </p>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRoomPickDialog(null)
+                  setSelectedRoomId(null)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={saveWithRoom}
+                disabled={placeEventMutation.isPending}
+              >
+                {placeEventMutation.isPending ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Schedule Class
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog - Searchable */}
       <Dialog open={Boolean(editDialog)} onOpenChange={(open) => !open && setEditDialog(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Event</DialogTitle>
-            <DialogDescription>Update room assignment</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit2 className="h-5 w-5 text-primary" />
+              Edit Event
+            </DialogTitle>
+            <DialogDescription>Update room assignment for this class</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 pt-4">
             <div>
-              <Label htmlFor="edit-room-select">Room</Label>
-              <Select
-                defaultValue={editDialog?.event?.room_id || 'none'}
-                onValueChange={(val) => {
-                  const roomId = val === 'none' ? null : val
+              <Label className="text-sm font-medium mb-2 block">Room</Label>
+              <RoomSelectSimple
+                rooms={rooms}
+                value={editDialog?.event?.room_id || null}
+                onChange={(roomId) => {
                   if (editDialog?.event) {
-                    handleEditSave(editDialog.event.id, editDialog.event.course_offerings?.faculty_id, roomId)
+                    handleEditSave(editDialog.event.id, roomId)
                   }
                 }}
-              >
-                <SelectTrigger id="edit-room-select">
-                  <SelectValue placeholder="Select room (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No room</SelectItem>
-                  {rooms.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.room_number}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
           </div>
         </DialogContent>

@@ -23,6 +23,7 @@
 - `timetable_versions`: per-batch draft/published/archived lifecycle.
 - `timetable_events`: grid cells referencing offerings.
 - `period_templates`: JSON timeslots (used by editor grid).
+- `academic_years` → `calendar_events`, `vacation_periods`, `exam_periods`, `teaching_periods`, `weekly_off_days` (calendar system)
 
 **Required columns for current UI**
 - `classes.name` (auto-name like `3CE1`)
@@ -448,8 +449,159 @@ CREATE TABLE period_templates (
 
 ---
 
-#### 13. `academic_calendar`
-**Purpose:** Academic calendar data (future attendance)
+### Academic Calendar Tables (New - December 2025)
+
+The Academic Calendar system uses **6 tables** for comprehensive attendance calculation support.
+
+**Schema File:** `sql-queries/migrations/03-academic_calendar.sql`  
+**Data Import:** `sql-queries/migrations/04-academic_calendar_2025_26_data.sql`  
+**UI Page:** `src/pages/AcademicCalendar.jsx`  
+**Utility Functions:** `src/lib/calendarUtils.js`
+
+#### 13. `academic_years`
+**Purpose:** Academic year definitions (e.g., 2025-26)
+
+```sql
+CREATE TABLE academic_years (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,           -- "2025-26"
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  is_current BOOLEAN DEFAULT false,
+  institution TEXT DEFAULT 'CHARUSAT',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  CHECK (end_date > start_date)
+);
+```
+
+**Notes:**
+- Only one year can be `is_current=true` (enforced by unique partial index)
+- All other calendar tables reference this via `academic_year_id`
+
+---
+
+#### 14. `calendar_events`
+**Purpose:** Individual holidays, academic events, college events
+
+```sql
+CREATE TABLE calendar_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  academic_year_id UUID REFERENCES academic_years(id) ON DELETE CASCADE,
+  event_date DATE NOT NULL,
+  end_date DATE,                       -- For multi-day events
+  event_type TEXT NOT NULL CHECK (event_type IN ('holiday', 'academic', 'college_event', 'exam', 'vacation')),
+  title TEXT NOT NULL,
+  description TEXT,
+  is_non_teaching BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Event Types:**
+- `holiday`: Public holidays (Republic Day, Diwali, etc.)
+- `academic`: Academic events (Convocation, Admission deadlines)
+- `college_event`: College-specific events (Sports week, Tech fest)
+- `exam`: Exam-related dates
+- `vacation`: Vacation markers
+
+---
+
+#### 15. `vacation_periods`
+**Purpose:** Multi-day vacation blocks
+
+```sql
+CREATE TABLE vacation_periods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  academic_year_id UUID REFERENCES academic_years(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,                  -- "Diwali Vacation"
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  applies_to TEXT DEFAULT 'all' CHECK (applies_to IN ('all', 'students', 'employees')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+#### 16. `exam_periods`
+**Purpose:** Exam weeks/periods
+
+```sql
+CREATE TABLE exam_periods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  academic_year_id UUID REFERENCES academic_years(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,                  -- "Odd Semester Regular Exam"
+  exam_type TEXT NOT NULL CHECK (exam_type IN ('regular', 'remedial', 'supplementary')),
+  semester_type TEXT NOT NULL CHECK (semester_type IN ('odd', 'even')),
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+#### 17. `teaching_periods`
+**Purpose:** When regular classes are in session
+
+```sql
+CREATE TABLE teaching_periods (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  academic_year_id UUID REFERENCES academic_years(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,                  -- "Odd Semester Teaching"
+  semester_type TEXT NOT NULL CHECK (semester_type IN ('odd', 'even')),
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+#### 18. `weekly_off_days`
+**Purpose:** Default weekly off days (Sunday, alternating Saturdays)
+
+```sql
+CREATE TABLE weekly_off_days (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  academic_year_id UUID REFERENCES academic_years(id) ON DELETE CASCADE,
+  day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Sunday
+  is_off BOOLEAN DEFAULT true,
+  note TEXT,
+  UNIQUE(academic_year_id, day_of_week)
+);
+```
+
+---
+
+### Helper Functions
+
+#### `is_teaching_day(check_date DATE, year_id UUID)`
+Returns `BOOLEAN` - whether the given date is a teaching day.
+
+**Logic:**
+1. Returns `false` if Sunday
+2. Returns `false` if in `weekly_off_days`
+3. Returns `false` if holiday with `is_non_teaching=true`
+4. Returns `false` if in `vacation_periods`
+5. Returns `false` if in `exam_periods`
+6. Otherwise returns `true`
+
+#### `count_teaching_days(from_date DATE, to_date DATE, year_id UUID)`
+Returns `INTEGER` - count of teaching days in the range.
+
+**Usage in Attendance Calculation:**
+```sql
+SELECT count_teaching_days('2025-07-21', '2025-11-15', year_id) as total_expected;
+```
+
+---
+
+### Legacy Academic Calendar Table
+
+#### `academic_calendar` (DEPRECATED)
+**Purpose:** Old single-table approach (replaced by above tables)
 
 ```sql
 CREATE TABLE academic_calendar (
@@ -462,24 +614,7 @@ CREATE TABLE academic_calendar (
 );
 ```
 
-**Planned Usage:**
-- Store holidays, exam weeks, semester boundaries
-- Calculate expected vs actual classes for attendance
-- Not yet implemented in UI
-
-**Example Payload (Future):**
-```json
-{
-  "semester": "Spring 2025",
-  "holidays": [
-    {"date": "2025-01-26", "name": "Republic Day"},
-    {"date": "2025-03-08", "name": "Holi"}
-  ],
-  "exam_weeks": [
-    {"start": "2025-05-15", "end": "2025-05-31"}
-  ]
-}
-```
+**Status:** Superseded by the 6-table normalized schema above. Kept for backwards compatibility.
 
 ---
 

@@ -7,13 +7,14 @@ import { SubjectForm } from '@/components/Forms/SubjectForm'
 import { FacultyForm } from '@/components/Forms/FacultyForm'
 import { RoomForm } from '@/components/Forms/RoomForm'
 import { TimetablePanel } from '@/components/Timetable/TimetablePanel'
-import { PeriodTemplatesTab } from '@/components/PeriodTemplatesTab'
+import PeriodTemplates from '@/pages/PeriodTemplates'
 import OfferingsNew from '@/pages/OfferingsNew'
 import { Button } from '@/components/ui/button'
-import { Plus, RefreshCw, BookOpen, Users, GraduationCap, MapPin, Calendar, Grid3x3, Clock, Layers } from 'lucide-react'
+import { Plus, RefreshCw, BookOpen, Users, GraduationCap, MapPin, Calendar, Grid3x3, Clock, Layers, Sparkles } from 'lucide-react'
 import { useStructureStore } from '@/lib/store'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { supabase } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
 
 export default function StructureExplorer() {
   const [formOpen, setFormOpen] = useState(false)
@@ -21,6 +22,7 @@ export default function StructureExplorer() {
   const [formNode, setFormNode] = useState(null)
   const [formType, setFormType] = useState('structure') // 'structure', 'subject', 'faculty', 'room'
   const [refreshKey, setRefreshKey] = useState(0)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState('structure')
   const { selectedNode } = useStructureStore()
 
@@ -152,8 +154,12 @@ export default function StructureExplorer() {
     handleRefresh()
   }
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    // Small delay for visual feedback
+    await new Promise(resolve => setTimeout(resolve, 300))
     setRefreshKey((k) => k + 1)
+    setIsRefreshing(false)
   }
 
   const renderForm = () => {
@@ -211,39 +217,52 @@ export default function StructureExplorer() {
       {/* Right Panel - Contextual Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <div className="border-b border-border px-6 py-3 bg-gradient-to-r from-background to-muted/10">
-            <TabsList className="w-full justify-start gap-1 rounded-xl border border-border/60 bg-muted/40 p-1 shadow-inner overflow-x-auto">
-              <TabsTrigger value="structure" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Grid3x3 className="h-4 w-4 mr-2" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="subjects" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <BookOpen className="h-4 w-4 mr-2 text-foreground" />
-                Subjects
-              </TabsTrigger>
-              <TabsTrigger value="offerings" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Layers className="h-4 w-4 mr-2 text-foreground" />
-                Offerings
-              </TabsTrigger>
-              {selectedNode?.type === 'batch' && (
-                <TabsTrigger value="timetable" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                  <Calendar className="h-4 w-4 mr-2 text-foreground" />
-                  Timetable
+          <div className="border-b border-border px-6 py-3 bg-gradient-to-r from-background via-muted/10 to-background">
+            <div className="flex items-center justify-between">
+              <TabsList className="flex-1 justify-start gap-1 rounded-xl border border-border/60 bg-muted/40 p-1.5 shadow-inner overflow-x-auto">
+                <TabsTrigger value="structure" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all">
+                  <Grid3x3 className="h-4 w-4 mr-2" />
+                  Overview
                 </TabsTrigger>
-              )}
-              <TabsTrigger value="faculty" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <GraduationCap className="h-4 w-4 mr-2 text-foreground" />
-                Faculty
-              </TabsTrigger>
-              <TabsTrigger value="rooms" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <MapPin className="h-4 w-4 mr-2 text-foreground" />
-                Rooms
-              </TabsTrigger>
-              <TabsTrigger value="periods" className="rounded-lg px-3 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                <Clock className="h-4 w-4 mr-2 text-foreground" />
-                Periods
-              </TabsTrigger>
-            </TabsList>
+                <TabsTrigger value="subjects" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all">
+                  <BookOpen className="h-4 w-4 mr-2 text-foreground" />
+                  Subjects
+                </TabsTrigger>
+                <TabsTrigger value="offerings" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all">
+                  <Layers className="h-4 w-4 mr-2 text-foreground" />
+                  Offerings
+                </TabsTrigger>
+                {selectedNode?.type === 'batch' && (
+                  <TabsTrigger value="timetable" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all">
+                    <Calendar className="h-4 w-4 mr-2 text-foreground" />
+                    Timetable
+                  </TabsTrigger>
+                )}
+                <TabsTrigger value="faculty" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all">
+                  <GraduationCap className="h-4 w-4 mr-2 text-foreground" />
+                  Faculty
+                </TabsTrigger>
+                <TabsTrigger value="rooms" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all">
+                  <MapPin className="h-4 w-4 mr-2 text-foreground" />
+                  Rooms
+                </TabsTrigger>
+                <TabsTrigger value="periods" className="rounded-lg px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-md transition-all">
+                  <Clock className="h-4 w-4 mr-2 text-foreground" />
+                  Periods
+                </TabsTrigger>
+              </TabsList>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="ml-4 gap-2 shrink-0"
+              >
+                <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-auto bg-gradient-to-br from-background via-transparent to-muted/5">
@@ -333,7 +352,7 @@ export default function StructureExplorer() {
             </TabsContent>
 
             <TabsContent value="periods" className="h-full m-0 p-6">
-              <PeriodTemplatesTab />
+              <PeriodTemplates />
             </TabsContent>
           </div>
         </Tabs>

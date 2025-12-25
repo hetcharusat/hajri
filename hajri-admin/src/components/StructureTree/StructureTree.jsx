@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Plus, RefreshCw } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
 import { TreeNode } from './TreeNode'
 import { supabase } from '@/lib/supabase'
-import { useStructureStore } from '@/lib/store'
+import { useStructureStore, useCommandPaletteStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
-export function StructureTree({ onAddRoot, collapsed = false }) {
-  const { searchQuery, setSearchQuery } = useStructureStore()
+export function StructureTree({ onAddRoot, onAddChild, onEdit, onDelete, collapsed = false }) {
+  const { refreshKey } = useStructureStore()
+  const { open: openCommandPalette } = useCommandPaletteStore()
   const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadDepartments()
-  }, [])
+  }, [refreshKey])
 
   const loadDepartments = async () => {
     setLoading(true)
@@ -42,55 +42,36 @@ export function StructureTree({ onAddRoot, collapsed = false }) {
     }
   }
 
-  const filteredDepartments = departments.filter((dept) =>
-    dept.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
   return (
     <div className="h-full flex flex-col bg-card">
       {/* Header */}
       <div className={cn(
         "border-b-2 bg-gradient-to-br from-primary/5 to-background shadow-sm",
-        collapsed ? "p-2" : "p-4 space-y-3"
+        collapsed ? "p-2" : "p-3"
       )}>
-        <div className={cn(
-          "flex items-center",
-          collapsed ? "justify-center" : "justify-between"
-        )}>
-          {!collapsed && <h2 className="font-bold text-lg tracking-tight">Structure Explorer</h2>}
-          {collapsed ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 hover:bg-primary/10 transition-colors"
-              onClick={loadDepartments}
-              title="Refresh Structure"
-            >
-              <RefreshCw className="h-5 w-5" />
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 hover:bg-primary/10 transition-colors"
-              onClick={loadDepartments}
-              title="Refresh"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-
         {!collapsed && (
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Search structure..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-10 text-sm shadow-sm border-2 focus:border-primary transition-all"
-            />
-          </div>
+          <button
+            type="button"
+            onClick={openCommandPalette}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-border bg-background hover:bg-secondary hover:border-primary/30 transition-all text-left group"
+          >
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <span className="flex-1 text-sm text-muted-foreground">Search all...</span>
+            <kbd className="pointer-events-none hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              Ctrl+K
+            </kbd>
+          </button>
+        )}
+        {collapsed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-full h-10 hover:bg-primary/10 transition-colors"
+            onClick={openCommandPalette}
+            title="Search (Ctrl+K)"
+          >
+            <Search className="h-5 w-5" />
+          </Button>
         )}
       </div>
 
@@ -104,27 +85,25 @@ export function StructureTree({ onAddRoot, collapsed = false }) {
             <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary border-t-transparent" />
             {!collapsed && <p className="text-sm text-muted-foreground font-medium">Loading structure...</p>}
           </div>
-        ) : filteredDepartments.length === 0 ? (
+        ) : departments.length === 0 ? (
           <div className="text-center py-12 px-4">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
               <Search className="h-8 w-8 text-muted-foreground" />
             </div>
             <p className="text-base font-semibold text-foreground mb-2">
-              {searchQuery ? 'No results found' : 'No departments yet'}
+              No departments yet
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              {searchQuery ? 'Try adjusting your search' : 'Get started by adding a department'}
+              Get started by adding a department
             </p>
-            {!searchQuery && (
-              <Button onClick={onAddRoot} size="default" className="shadow-md">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Department
-              </Button>
-            )}
+            <Button onClick={onAddRoot} size="default" className="shadow-md">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Department
+            </Button>
           </div>
         ) : (
           <div className="space-y-1">
-            {filteredDepartments.map((dept) => (
+            {departments.map((dept) => (
               <TreeNode key={dept.id} node={dept} level={0} collapsed={collapsed} />
             ))}
           </div>
@@ -132,7 +111,7 @@ export function StructureTree({ onAddRoot, collapsed = false }) {
       </div>
 
       {/* Footer */}
-      {!collapsed && !loading && filteredDepartments.length > 0 && (
+      {!collapsed && !loading && departments.length > 0 && (
         <div className="p-3 border-t-2 bg-muted/20">
           <Button onClick={onAddRoot} variant="outline" size="default" className="w-full font-medium hover:bg-primary/5 hover:border-primary/50 transition-all">
             <Plus className="h-4 w-4 mr-2" />

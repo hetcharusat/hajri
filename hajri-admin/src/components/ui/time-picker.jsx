@@ -1,84 +1,261 @@
-import React, { useState } from 'react'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
-import { Clock } from 'lucide-react'
+import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Clock, ChevronUp, ChevronDown } from 'lucide-react'
 
+/**
+ * Enhanced Time Picker with visual selection
+ * Features: Manual input, hour/minute spinners, AM/PM toggle, quick select
+ */
 export function TimePicker({
   value,
   onChange,
   className,
-  error,
   disabled,
   placeholder = 'Select time',
-  showTimeSelectOnly = true,
-  showTimeSelect = true,
-  timeIntervals = 15,
-  timeCaption = 'Time',
-  dateFormat = 'h:mm aa',
+  use24Hour = false,
+  minuteStep = 5,
+  error,
   ...props
 }) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  const handleChange = (date) => {
-    onChange?.(date)
-  }
-
-  const formatTimeForInput = (date) => {
-    if (!date) return null
-    if (typeof date === 'string') {
-      // If it's already a time string like "09:00:00" or "09:00"
-      const timeStr = date.includes(':') ? date.split(' ')[0] : date
-      const [hours, minutes] = timeStr.split(':').map(Number)
-      if (!isNaN(hours) && !isNaN(minutes)) {
-        const d = new Date()
-        d.setHours(hours, minutes || 0, 0, 0)
-        return d
+  const [open, setOpen] = React.useState(false)
+  const [inputValue, setInputValue] = React.useState('')
+  
+  // Parse current value
+  const { hours: currentHours, minutes: currentMinutes } = React.useMemo(() => {
+    if (!value) return { hours: 9, minutes: 0 }
+    // Handle string format "HH:MM:SS" or "HH:MM"
+    if (typeof value === 'string') {
+      const parts = value.split(':')
+      return {
+        hours: parseInt(parts[0], 10) || 9,
+        minutes: parseInt(parts[1], 10) || 0
       }
-      return null
     }
-    return date instanceof Date ? date : null
+    // Handle Date object
+    if (value instanceof Date) {
+      return {
+        hours: value.getHours(),
+        minutes: value.getMinutes()
+      }
+    }
+    return { hours: 9, minutes: 0 }
+  }, [value])
+
+  // Update input display when value changes
+  React.useEffect(() => {
+    if (value) {
+      setInputValue(formatTimeForDisplay(currentHours, currentMinutes, use24Hour))
+    }
+  }, [value, currentHours, currentMinutes, use24Hour])
+
+  function formatTimeForDisplay(hours, minutes, is24Hour = false) {
+    const mins = String(minutes).padStart(2, '0')
+    
+    if (is24Hour) {
+      return `${String(hours).padStart(2, '0')}:${mins}`
+    }
+    
+    const period = hours >= 12 ? 'PM' : 'AM'
+    let displayHours = hours
+    if (hours === 0) displayHours = 12
+    else if (hours > 12) displayHours = hours - 12
+    
+    return `${displayHours}:${mins} ${period}`
   }
 
-  const inputValue = formatTimeForInput(value)
+  function formatTimeForDatabase(hours, minutes) {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`
+  }
+
+  function handleTimeChange(newHours, newMinutes) {
+    const dbTime = formatTimeForDatabase(newHours, newMinutes)
+    onChange?.(dbTime)
+  }
+
+  function incrementHours(delta) {
+    let newHours = currentHours + delta
+    if (newHours > 23) newHours = 0
+    if (newHours < 0) newHours = 23
+    handleTimeChange(newHours, currentMinutes)
+  }
+
+  function incrementMinutes(delta) {
+    let newMinutes = currentMinutes + delta
+    let newHours = currentHours
+    
+    if (newMinutes >= 60) {
+      newMinutes = 0
+      newHours = (newHours + 1) % 24
+    } else if (newMinutes < 0) {
+      newMinutes = 60 + newMinutes
+      newHours = newHours === 0 ? 23 : newHours - 1
+    }
+    
+    handleTimeChange(newHours, newMinutes)
+  }
+
+  function togglePeriod() {
+    const newHours = currentHours >= 12 ? currentHours - 12 : currentHours + 12
+    handleTimeChange(newHours, currentMinutes)
+  }
+
+  function handleInputChange(e) {
+    setInputValue(e.target.value)
+  }
+
+  function handleInputBlur() {
+    const parsed = parseTimeInput(inputValue)
+    if (parsed) {
+      handleTimeChange(parsed.hours, parsed.minutes)
+    } else if (value) {
+      setInputValue(formatTimeForDisplay(currentHours, currentMinutes, use24Hour))
+    }
+  }
+
+  function handleInputKeyDown(e) {
+    if (e.key === 'Enter') {
+      handleInputBlur()
+      setOpen(false)
+    }
+  }
+
+  function parseTimeInput(input) {
+    if (!input) return null
+    const cleaned = input.trim().toUpperCase()
+    
+    // Try HH:MM AM/PM format
+    const ampmMatch = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i)
+    if (ampmMatch) {
+      let hours = parseInt(ampmMatch[1], 10)
+      const minutes = parseInt(ampmMatch[2], 10)
+      const period = ampmMatch[3]?.toUpperCase()
+      
+      if (period === 'PM' && hours < 12) hours += 12
+      if (period === 'AM' && hours === 12) hours = 0
+      
+      if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+        return { hours, minutes }
+      }
+    }
+    
+    return null
+  }
+
+  const displayHours = use24Hour 
+    ? currentHours 
+    : (currentHours === 0 ? 12 : currentHours > 12 ? currentHours - 12 : currentHours)
+  
+  const period = currentHours >= 12 ? 'PM' : 'AM'
 
   return (
-    <div className={cn('relative w-full', className)}>
-      <div className="relative">
-        <DatePicker
-          selected={inputValue}
-          onChange={handleChange}
-          showTimeSelectOnly={showTimeSelectOnly}
-          showTimeSelect={showTimeSelect}
-          timeIntervals={timeIntervals}
-          timeCaption={timeCaption}
-          dateFormat={dateFormat}
-          placeholderText={placeholder}
-          disabled={disabled}
-          open={isOpen}
-          onInputClick={() => setIsOpen(true)}
-          onClickOutside={() => setIsOpen(false)}
-          className={cn(
-            'flex h-11 w-full rounded-lg border-2 bg-background px-4 py-2.5 pl-10 text-sm font-medium shadow-sm transition-all',
-            'ring-offset-background',
-            'placeholder:text-muted-foreground/70 placeholder:font-normal',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary focus-visible:shadow-md',
-            'hover:border-primary/50 hover:shadow-md',
-            'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border disabled:hover:shadow-sm',
-            error
-              ? 'border-destructive focus-visible:border-destructive focus-visible:ring-destructive'
-              : 'border-border',
-            className
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="relative w-full">
+          <Input
+            value={inputValue}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            onKeyDown={handleInputKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+            className={cn(
+              'pl-10 pr-4 font-mono cursor-pointer h-11',
+              error && 'border-destructive',
+              className
+            )}
+            {...props}
+          />
+          <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        </div>
+      </PopoverTrigger>
+      
+      <PopoverContent className="w-auto p-4" align="start">
+        {/* Time Spinners */}
+        <div className="flex items-center justify-center gap-3">
+          {/* Hours */}
+          <div className="flex flex-col items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 hover:bg-primary/10 rounded-lg"
+              onClick={() => incrementHours(1)}
+            >
+              <ChevronUp className="h-5 w-5" />
+            </Button>
+            <div className="w-16 h-16 flex items-center justify-center text-3xl font-bold font-mono bg-muted rounded-xl border-2 border-border shadow-inner">
+              {String(displayHours).padStart(2, '0')}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 hover:bg-primary/10 rounded-lg"
+              onClick={() => incrementHours(-1)}
+            >
+              <ChevronDown className="h-5 w-5" />
+            </Button>
+            <span className="text-[10px] text-muted-foreground mt-1 font-medium">HOUR</span>
+          </div>
+
+          <span className="text-4xl font-bold text-muted-foreground mb-8">:</span>
+
+          {/* Minutes */}
+          <div className="flex flex-col items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 hover:bg-primary/10 rounded-lg"
+              onClick={() => incrementMinutes(minuteStep)}
+            >
+              <ChevronUp className="h-5 w-5" />
+            </Button>
+            <div className="w-16 h-16 flex items-center justify-center text-3xl font-bold font-mono bg-muted rounded-xl border-2 border-border shadow-inner">
+              {String(currentMinutes).padStart(2, '0')}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 hover:bg-primary/10 rounded-lg"
+              onClick={() => incrementMinutes(-minuteStep)}
+            >
+              <ChevronDown className="h-5 w-5" />
+            </Button>
+            <span className="text-[10px] text-muted-foreground mt-1 font-medium">MIN</span>
+          </div>
+
+          {/* AM/PM Toggle */}
+          {!use24Hour && (
+            <div className="flex flex-col items-center ml-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 hover:bg-primary/10 rounded-lg"
+                onClick={togglePeriod}
+              >
+                <ChevronUp className="h-5 w-5" />
+              </Button>
+              <div 
+                className="w-16 h-16 flex items-center justify-center text-xl font-bold bg-primary/10 text-primary rounded-xl border-2 border-primary/30 cursor-pointer hover:bg-primary/20 transition-colors shadow-inner"
+                onClick={togglePeriod}
+              >
+                {period}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 hover:bg-primary/10 rounded-lg"
+                onClick={togglePeriod}
+              >
+                <ChevronDown className="h-5 w-5" />
+              </Button>
+              <span className="text-[10px] text-muted-foreground mt-1 font-medium">PERIOD</span>
+            </div>
           )}
-          wrapperClassName="w-full"
-          {...props}
-        />
-        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-      </div>
-      {error && (
-        <p className="mt-1.5 text-sm text-destructive font-medium">{error}</p>
-      )}
-    </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

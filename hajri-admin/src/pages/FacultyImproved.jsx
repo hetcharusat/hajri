@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { 
   Plus, Search, AlertCircle, Trash2, Users, 
-  Mail, GraduationCap, Edit2, X, Check
+  Mail, GraduationCap, Edit2, X, Check, RefreshCw
 } from 'lucide-react'
 
 export default function FacultyImproved() {
   const [faculty, setFaculty] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -25,6 +26,15 @@ export default function FacultyImproved() {
   useEffect(() => {
     loadData()
   }, [])
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    try {
+      await loadData()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   async function loadData() {
     try {
@@ -136,10 +146,21 @@ export default function FacultyImproved() {
           </h1>
           <p className="text-muted-foreground mt-1">Manage faculty members. Assign them to courses in the Assignments tab.</p>
         </div>
-        <Button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="mr-2" size={18} />
-          Add Faculty
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleRefresh} 
+            disabled={refreshing || loading}
+            className="gap-2"
+          >
+            <RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+            Refresh
+          </Button>
+          <Button onClick={handleAddNew} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="mr-2" size={18} />
+            Add Faculty
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -254,7 +275,7 @@ export default function FacultyImproved() {
                 {/* Name */}
                 <div>
                   <label className="block text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
-                    <Users size={16} className="text-primary" />
+                    <Users size={16} className="text-foreground" />
                     Full Name *
                   </label>
                   <Input
@@ -270,7 +291,7 @@ export default function FacultyImproved() {
                 {/* Email */}
                 <div>
                   <label className="block text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
-                    <Mail size={16} className="text-primary" />
+                    <Mail size={16} className="text-foreground" />
                     Email Address
                   </label>
                   <Input

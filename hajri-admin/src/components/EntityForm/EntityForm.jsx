@@ -35,7 +35,7 @@ const generateAutoName = async (type, data) => {
   return null
 }
 
-export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
+export function EntityForm({ open, onOpenChange, node, mode = 'add', onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState({})
@@ -50,13 +50,16 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
 
   const initializeForm = () => {
     if (mode === 'edit' && node) {
-      // Load existing data for edit mode
       setFormData({
         name: node.name || '',
-        ...getTypeSpecificDefaults(node.type)
+        abbreviation: node.abbreviation || node.meta || '',
+        semester_number: node.semester_number || '',
+        start_date: node.start_date || '',
+        end_date: node.end_date || '',
+        class_number: node.class_number || '',
+        batch_letter: node.batch_letter || '',
       })
     } else {
-      // Set defaults for add mode
       setFormData(getTypeSpecificDefaults(getChildType(node?.type)))
     }
   }
@@ -91,11 +94,6 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
     if (!node) return
 
     try {
-      if (node.type === 'root' || mode === 'add' && node.type === 'department') {
-        // No dependencies needed
-        return
-      }
-
       if ((mode === 'add' && node.type === 'branch') || (mode === 'edit' && node.type === 'branch')) {
         const { data: depts } = await supabase
           .from('departments')
@@ -106,6 +104,12 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
     } catch (err) {
       console.error('Failed to load dependencies:', err)
     }
+  }
+
+  const handleClose = () => {
+    setError('')
+    setFormData({})
+    onOpenChange?.(false)
   }
 
   const handleSubmit = async (e) => {
@@ -123,7 +127,7 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
       }
 
       onSuccess?.()
-      onClose()
+      handleClose()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -144,25 +148,25 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
         data = {
           name: formData.name.trim(),
           abbreviation: formData.abbreviation.trim().toUpperCase(),
-          department_id: formData.department_id || null,
+          department_id: node?.id || null,
         }
         await supabase.from('branches').insert([data]).throwOnError()
         break
 
       case 'semester':
         data = {
-          branch_id: formData.branch_id,
+          branch_id: node?.id,
           semester_number: parseInt(formData.semester_number),
-          start_date: formData.start_date,
-          end_date: formData.end_date,
+          start_date: formData.start_date || null,
+          end_date: formData.end_date || null,
         }
         await supabase.from('semesters').insert([data]).throwOnError()
         break
 
       case 'class':
-        const autoClassName = await generateAutoName('class', formData)
+        const autoClassName = await generateAutoName('class', { semester_id: node?.id, class_number: formData.class_number })
         data = {
-          semester_id: formData.semester_id,
+          semester_id: node?.id,
           class_number: parseInt(formData.class_number),
           name: autoClassName || `Class ${formData.class_number}`,
         }
@@ -170,9 +174,9 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
         break
 
       case 'batch':
-        const autoBatchName = await generateAutoName('batch', formData)
+        const autoBatchName = await generateAutoName('batch', { class_id: node?.id, batch_letter: formData.batch_letter })
         data = {
-          class_id: formData.class_id,
+          class_id: node?.id,
           batch_letter: formData.batch_letter.trim().toUpperCase(),
           name: autoBatchName || `Batch ${formData.batch_letter.toUpperCase()}`,
         }
@@ -200,12 +204,18 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
 
       case 'semester':
         data = {
-          start_date: formData.start_date,
-          end_date: formData.end_date,
+          semester_number: parseInt(formData.semester_number),
+          start_date: formData.start_date || null,
+          end_date: formData.end_date || null,
         }
         break
 
-      caconst updatedClassName = await generateAutoName('class', { ...node, ...formData, semester_id: node.semester_id })
+      case 'class':
+        table = 'classes'
+        const updatedClassName = await generateAutoName('class', { 
+          semester_id: node.semester_id, 
+          class_number: formData.class_number 
+        })
         data = { 
           class_number: parseInt(formData.class_number),
           ...(updatedClassName && { name: updatedClassName })
@@ -214,17 +224,24 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
 
       case 'batch':
         table = 'batches'
-        const updatedBatchName = await generateAutoName('batch', { ...node, batch_letter: formData.batch_letter, class_id: node.class_id })
+        const updatedBatchName = await generateAutoName('batch', { 
+          class_id: node.class_id, 
+          batch_letter: formData.batch_letter 
+        })
         data = { 
           batch_letter: formData.batch_letter.trim().toUpperCase(),
-          ...(updatedBatchName && { name: updatedBatch
-          batch_letter: formData.batch_letter.trim().toUpperCase(),
-          ...(previewName && { name: previewName })
+          ...(updatedBatchName && { name: updatedBatchName })
         }
         break
     }
 
     await supabase.from(table).update(data).eq('id', node.id).throwOnError()
+  }
+
+  const getTitle = () => {
+    const type = mode === 'edit' ? node?.type : getChildType(node?.type)
+    const action = mode === 'edit' ? 'Edit' : 'Add'
+    return `${action} ${type?.charAt(0).toUpperCase()}${type?.slice(1) || ''}`
   }
 
   const renderFields = () => {
@@ -261,19 +278,9 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
                 onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value })}
                 maxLength={5}
                 required
+                className="uppercase"
               />
             </FormField>
-            {mode === 'add' && dependencies.departments && (
-              <FormField label="Department (Optional)">
-                <EnhancedSelect
-                  value={formData.department_id ? { value: formData.department_id, label: dependencies.departments.find(d => d.id === formData.department_id)?.name || 'None' } : null}
-                  onChange={(option) => setFormData({ ...formData, department_id: option?.value || '' })}
-                  options={dependencies.departments.map(d => ({ value: d.id, label: d.name }))}
-                  placeholder="Select department (optional)"
-                  isClearable
-                />
-              </FormField>
-            )}
           </>
         )
 
@@ -281,33 +288,36 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
         return (
           <>
             <FormField label="Semester Number" required>
-              <EnhancedSelect
-                value={formData.semester_number ? { value: formData.semester_number, label: `Semester ${formData.semester_number}` } : null}
-                onChange={(option) => setFormData({ ...formData, semester_number: option?.value || '' })}
-                options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: n, label: `Semester ${n}` }))}
-                placeholder="Select semester"
+              <Input
+                type="number"
+                min="1"
+                max="8"
+                placeholder="e.g. 1, 2, 3..."
+                value={formData.semester_number || ''}
+                onChange={(e) => setFormData({ ...formData, semester_number: e.target.value })}
+                required
               />
             </FormField>
-            <FormField label="Start Date" required>
+            <FormField label="Start Date">
               <Input
                 type="date"
                 value={formData.start_date || ''}
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                required
               />
             </FormField>
-            <FormField label="End Date" required>
+            <FormField label="End Date">
               <Input
                 type="date"
                 value={formData.end_date || ''}
                 onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                required
               />
             </FormField>
           </>
         )
 
-      case FormField label="Class Number" required>
+      case 'class':
+        return (
+          <FormField label="Class Number" required>
             <Input
               type="number"
               min="1"
@@ -315,64 +325,46 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
               value={formData.class_number || ''}
               onChange={(e) => setFormData({ ...formData, class_number: e.target.value })}
               required
-              className="text-base"
             />
             <div className="mt-2 text-xs text-muted-foreground">
-              Auto-naming: <span className="font-mono font-semibold">{'{'}semester{'}{'}branch{'}{'}number{'}'}</span> (e.g., 3CE1)
+              Auto-naming: <span className="font-mono font-semibold">{'{semester}{branch}{number}'}</span> (e.g., 3CE1)
             </div>
-          </FormField  </div>
-            )}
-          </>
+          </FormField>
         )
 
       case 'batch':
         return (
-          <>
-            <FormField label="Batch Letter" required>
-              <Input
-                placeholder="e.g. A, B, C"
-                value={formData.batch_letter || ''}
-                onChange={(e) => setFormData({ ...formData, batch_letter: e.target.value })}
-                maxLength={1}
-                required
-              />
-            </FormField>
-            
-            {previewName && (
-              <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="text-sm font-semibold text-primary">📝 Auto-Generated Name:</div>
-                  <div className="text-lg font-bold font-mono text-foreground">{previewName}</div>
-           FormField label="Batch Letter" required>
+          <FormField label="Batch Letter" required>
             <Input
               placeholder="e.g. A, B, C"
               value={formData.batch_letter || ''}
               onChange={(e) => setFormData({ ...formData, batch_letter: e.target.value })}
               maxLength={1}
               required
-              className="text-base uppercase"
+              className="uppercase"
             />
             <div className="mt-2 text-xs text-muted-foreground">
-              Auto-naming: <span className="font-mono font-semibold">{'{'}semester{'}{'}branch{'}{'}class{'}'}-{'{'}letter{'}'}</span> (e.g., 3CE1-A)
+              Auto-naming: <span className="font-mono font-semibold">{'{semester}{branch}{class}-{letter}'}</span> (e.g., 3CE1-A)
             </div>
-          </FormField
+          </FormField>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  return (
     <SlidePanel
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title={getTitle()}
       onSubmit={handleSubmit}
       loading={loading}
     >
       {error && (
-        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive mb-4">
           {error}
-        </div>
-      )}
-      
-      {/* Debug indicator - remove after confirming it works */}
-      {import.meta.env.DEV && namingContext && (
-        <div className="mb-3 p-2 rounded text-xs bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400">
-          ✓ Auto-naming ready: {namingContext.type === 'class' ? `${namingContext.semesterNumber}${namingContext.branchAbbr}[N]` : `${namingContext.semesterNumber}${namingContext.branchAbbr}${namingContext.classNumber}-[X]`}
         </div>
       )}
       
@@ -380,8 +372,3 @@ export function EntityForm({ open, onClose, node, mode = 'add', onSuccess }) {
     </SlidePanel>
   )
 }
-4 rounded-lg bg-destructive/10 border-l-4 border-destructive text-sm text-destructive mb-4 shadow-sm">
-          <div className="font-semibold mb-1">Error</div>
-          {error}
-        </div>
-      )}

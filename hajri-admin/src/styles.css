@@ -4,60 +4,46 @@
 
 @layer base {
   :root {
-    /* Locked palette (see prompt.txt requirement #4) */
-    --background: 224 40.5% 7.3%; /* #0B0F1A */
-    --foreground: 220 13% 91%; /* #E5E7EB */
+    /* Clean Dark Theme - Slate/Gray Base */
+    --background: 222 47% 6%; /* #090C14 */
+    --foreground: 210 20% 92%; /* #E8ECF0 */
 
-    --card: 222.2 47.4% 11.2%; /* #0F172A */
-    --card-foreground: 220 13% 91%;
+    --card: 222 47% 9%; /* #0F1520 */
+    --card-foreground: 210 20% 92%;
 
-    --popover: 222.2 47.4% 11.2%;
-    --popover-foreground: 220 13% 91%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 20% 92%;
 
-    --primary: 217.2 91.2% 59.8%; /* #3B82F6 */
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%; /* #3B82F6 Blue */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220.9 39.3% 11%; /* #111827 */
-    --secondary-foreground: 220 13% 91%;
+    --secondary: 222 30% 14%; /* #1A2332 */
+    --secondary-foreground: 210 20% 85%;
 
-    --muted: 220.9 39.3% 11%;
-    --muted-foreground: 217.9 10.6% 64.9%; /* #9CA3AF */
+    --muted: 222 25% 16%;
+    --muted-foreground: 215 15% 55%;
 
-    --accent: 220.9 39.3% 11%;
-    --accent-foreground: 220 13% 91%;
+    --accent: 262 83% 58%; /* #8B5CF6 Purple for accents */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%; /* #EF4444 */
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220.9 39.3% 11%;
-    --input: 220.9 39.3% 11%;
-    --ring: 217.2 91.2% 59.8%;
-    --radius: 0.5rem;
+    --border: 222 25% 18%;
+    --input: 222 25% 12%;
+    --ring: 217 91% 60%;
+    --radius: 0.625rem;
 
-    /* Semantic color tokens */
-    --success: 142 76% 36%; /* #10B981 - Green */
-    --success-foreground: 210 40% 98%;
-    --warning: 38 92% 50%; /* #F59E0B - Amber */
-    --warning-foreground: 210 40% 98%;
-    --info: 217.2 91.2% 59.8%; /* #3B82F6 - Blue */
-    --info-foreground: 210 40% 98%;
+    /* Semantic colors */
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 0%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
 
-    /* Border opacity levels */
-    --border-opacity-default: 1;
-    --border-opacity-hover: 0.8;
-    --border-opacity-disabled: 0.3;
-
-    /* Shadow tokens for depth hierarchy */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-
-    /* Focus ring colors with better contrast */
-    --ring-offset: 224 40.5% 7.3%;
-    --ring-offset-width: 2px;
-    --ring-width: 2px;
+    /* Shadows */
+    --shadow-color: 222 50% 3%;
   }
 }
 
@@ -66,47 +52,43 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Custom scrollbar styling for dark theme */
+  /* Scrollbar */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
-    @apply bg-card;
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-muted rounded-full;
-    border: 2px solid transparent;
-    background-clip: padding-box;
+    @apply bg-border rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/40;
+    @apply bg-muted-foreground/30;
   }
 }
 
-/* Utility classes for semantic colors */
+/* Utility classes */
 @layer utilities {
-  .text-success {
-    color: hsl(var(--success));
+  .text-success { color: hsl(var(--success)); }
+  .bg-success { background-color: hsl(var(--success)); }
+  .text-warning { color: hsl(var(--warning)); }
+  .bg-warning { background-color: hsl(var(--warning)); }
+  .text-info { color: hsl(var(--info)); }
+  .bg-info { background-color: hsl(var(--info)); }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
   }
-  .bg-success {
-    background-color: hsl(var(--success));
-  }
-  .text-warning {
-    color: hsl(var(--warning));
-  }
-  .bg-warning {
-    background-color: hsl(var(--warning));
-  }
-  .text-info {
-    color: hsl(var(--info));
-  }
-  .bg-info {
-    background-color: hsl(var(--info));
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }
 
@@ -127,6 +109,21 @@
   .grid-stats {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
+}
+
+/* Native date input dark mode fixes */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 /* React DatePicker custom styles */
@@ -267,4 +264,119 @@
 
 .icon-muted {
   color: hsl(var(--muted-foreground));
+}
+
+/* ========================================
+   Academic Calendar Styles
+   ======================================== */
+
+/* Calendar grid animations */
+@keyframes calendarFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes calendarSlideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes calendarSlideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0);
+  }
+}
+
+@keyframes eventPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.calendar-grid {
+  animation: calendarFadeIn 0.3s ease-out;
+}
+
+.calendar-day {
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+  background-color: hsl(var(--muted) / 0.5);
+  transform: scale(1.02);
+  z-index: 10;
+  box-shadow: 0 4px 12px hsl(var(--shadow-color) / 0.3);
+}
+
+.calendar-day-today {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.calendar-event {
+  animation: eventPop 0.2s ease-out;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.calendar-event:hover {
+  transform: translateX(2px);
+  filter: brightness(1.1);
+}
+
+/* Month header with gradient */
+.calendar-month-header {
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--secondary)) 100%);
+}
+
+/* Day number styles */
+.calendar-day-number {
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover .calendar-day-number {
+  transform: scale(1.1);
+}
+
+/* Legend item hover */
+.calendar-legend-item {
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.calendar-legend-item:hover {
+  transform: translateY(-2px);
 }

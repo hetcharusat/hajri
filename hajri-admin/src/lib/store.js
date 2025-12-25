@@ -104,6 +104,7 @@ export const useStructureStore = create((set) => ({
   expandedNodes: new Set(), // Always starts empty - tree collapsed by default
   searchQuery: '',
   recentNodes: [], // last 5 visited
+  refreshKey: 0, // increment to trigger tree refresh
 
   setSelectedNode: (node) =>
     set((state) => {
@@ -137,4 +138,14 @@ export const useStructureStore = create((set) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
 
   clearSelection: () => set({ selectedNode: null }),
+
+  triggerRefresh: () => set((state) => ({ refreshKey: state.refreshKey + 1 })),
+}))
+
+// Command Palette store (global state for opening/closing)
+export const useCommandPaletteStore = create((set) => ({
+  isOpen: false,
+  open: () => set({ isOpen: true }),
+  close: () => set({ isOpen: false }),
+  toggle: () => set((state) => ({ isOpen: !state.isOpen })),
 }))

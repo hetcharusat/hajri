@@ -61,6 +61,25 @@ Many UI elements have MULTIPLE implementations in different files. This guide he
 | Period templates page | `src/pages/PeriodTemplates.jsx` | Main page |
 | Period templates tab | `src/components/PeriodTemplatesTab.jsx` | Tab component |
 
+### Academic Calendar (Global Scope)
+
+| What You See | Location | Notes |
+|-------------|----------|-------|
+| Academic Calendar page | `src/pages/AcademicCalendar.jsx` | Full calendar UI with 4 tabs |
+| Calendar utility functions | `src/lib/calendarUtils.js` | Attendance engine integration |
+| Calendar database schema | `sql-queries/migrations/03-academic_calendar.sql` | 6 tables + RLS |
+| 2025-26 data import | `sql-queries/migrations/04-academic_calendar_2025_26_data.sql` | CHARUSAT data |
+| Calendar CSS animations | `src/styles.css` | `.calendar-*` classes |
+
+**Features:**
+- Calendar view with month navigation
+- Events & Holidays tab with search
+- Periods tab (vacations, exams, teaching periods)
+- Settings tab (weekly off days, statistics)
+- Non-teaching day detection for attendance
+
+**Route:** `/app/academic-calendar`
+
 ---
 
 ## 📂 Directory Structure
@@ -134,15 +153,16 @@ The class/batch auto-naming (`3CE1`, `3CE1-A`) is implemented in THREE locations
 Defined in `src/App.tsx`:
 
 ```tsx
-/login                → Login.jsx
-/app/overview         → Overview.jsx
-/app/subjects         → Subjects.jsx
-/app/faculty          → FacultyImproved.jsx  // NOT faculty/
-/app/rooms            → Rooms.jsx
-/app/assignments      → OfferingsNew.jsx
-/app/timetable        → TimetableNew.jsx
-/app/period-templates → PeriodTemplates.jsx
-/settings             → Settings.jsx
+/login                  → Login.jsx
+/app/overview           → Overview.jsx
+/app/subjects           → Subjects.jsx
+/app/faculty            → FacultyImproved.jsx  // NOT faculty/
+/app/rooms              → Rooms.jsx
+/app/assignments        → OfferingsNew.jsx
+/app/timetable          → TimetableNew.jsx
+/app/period-templates   → PeriodTemplates.jsx
+/app/academic-calendar  → AcademicCalendar.jsx  // Global scope
+/settings               → Settings.jsx
 ```
 
 ---
