@@ -161,7 +161,7 @@ function TimetableBlock({ event, onEdit, onDelete, viewMode }) {
 export default function TimetableNew() {
   const queryClient = useQueryClient()
   const { selectedNode } = useStructureStore()
-  const { batchId } = useScopeStore()
+  const { batchId, departmentId } = useScopeStore()
 
   const [viewMode, setViewMode] = useState('draft')
   const [error, setError] = useState('')
@@ -181,13 +181,18 @@ export default function TimetableNew() {
   )
 
   const roomsQuery = useQuery({
-    queryKey: ['rooms'],
+    queryKey: ['rooms', { departmentId }],
     queryFn: async () => {
       if (!supabase) throw new Error('Supabase not configured')
-      const { data, error } = await supabase.from('rooms').select('*').order('room_number')
+      let query = supabase.from('rooms').select('*')
+      if (departmentId) {
+        query = query.eq('department_id', departmentId)
+      }
+      const { data, error } = await query.order('room_number')
       if (error) throw error
       return data || []
     },
+    enabled: Boolean(departmentId),
   })
 
   const activeTemplateQuery = useQuery({

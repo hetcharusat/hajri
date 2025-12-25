@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useScopeStore } from '../lib/store'
 import { Plus, Upload, Download, Search, AlertCircle, Trash2, MapPin } from 'lucide-react'
 
 export default function Rooms() {
+  const { departmentId } = useScopeStore()
   const [rooms, setRooms] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -16,10 +18,21 @@ export default function Rooms() {
   })
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (departmentId) {
+      loadData()
+    } else {
+      setRooms([])
+      setLoading(false)
+    }
+  }, [departmentId])
 
   async function loadData() {
+    if (!departmentId) {
+      setRooms([])
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -27,6 +40,7 @@ export default function Rooms() {
       const { data, error: fetchError } = await supabase
         .from('rooms')
         .select('*')
+        .eq('department_id', departmentId)
         .order('room_number', { ascending: true })
 
       if (fetchError) throw fetchError
@@ -41,12 +55,20 @@ export default function Rooms() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!departmentId) {
+      setError('Please select a department from the tree to add rooms')
+      return
+    }
+
     try {
       setError(null)
 
       const { error: insertError } = await supabase
         .from('rooms')
-        .insert([formData])
+        .insert([{
+          ...formData,
+          department_id: departmentId,
+        }])
 
       if (insertError) throw insertError
 
@@ -80,6 +102,12 @@ export default function Rooms() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (!departmentId) {
+      setError('Please select a department from the tree to import rooms')
+      e.target.value = ''
+      return
+    }
+
     try {
       setError(null)
       const text = await file.text()
@@ -106,6 +134,7 @@ export default function Rooms() {
         roomsToInsert.push({
           room_number: roomNumber,
           type: type,
+          department_id: departmentId,
         })
       }
 
@@ -164,11 +193,29 @@ export default function Rooms() {
     return <div className="p-6">Loading rooms...</div>
   }
 
+  if (!departmentId) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Room Management</h1>
+          <p className="text-muted-foreground">Manage classrooms, labs, and halls</p>
+        </div>
+        <div className="bg-card border-2 border-border rounded-lg p-8 text-center">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Select a Department</h2>
+          <p className="text-muted-foreground">
+            Please select a department from the tree to view and manage rooms.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Room Management</h1>
-        <p className="text-muted-foreground">Manage classrooms, labs, and halls</p>
+        <p className="text-muted-foreground">Manage classrooms, labs, and halls for the selected department</p>
       </div>
 
       {/* Stats Cards */}
@@ -242,7 +289,7 @@ export default function Rooms() {
               placeholder="Search rooms..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-2 border border-border bg-background rounded w-64"
+              className="px-3 py-2 border-2 border-border bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors w-64"
             />
           </div>
         </div>
@@ -252,11 +299,11 @@ export default function Rooms() {
       <div className="bg-card p-4 rounded-lg border border-border mb-6">
         <div className="flex gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium mb-2">Room Type</label>
+            <label className="block text-sm font-medium mb-2 text-foreground">Room Type</label>
             <select
               value={filterType || ''}
               onChange={(e) => setFilterType(e.target.value || null)}
-              className="w-full border border-border bg-background rounded px-3 py-2"
+              className="w-full border-2 border-border bg-background rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
             >
               <option value="">All Types</option>
               <option value="CLASSROOM">Classroom</option>
@@ -327,23 +374,27 @@ export default function Rooms() {
             <h2 className="text-xl font-bold mb-4">Add Room</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Room Number *</label>
+                <label className="block text-sm font-medium mb-2 text-foreground">
+                  Room Number <span className="text-destructive">*</span>
+                </label>
                 <input
                   type="text"
                   value={formData.room_number}
                   onChange={(e) => setFormData({ ...formData, room_number: e.target.value })}
-                  className="w-full border border-border bg-background rounded px-3 py-2"
+                  className="w-full border-2 border-border bg-background rounded-md px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                   placeholder="e.g., 101, A-204"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Type *</label>
+                <label className="block text-sm font-medium mb-2 text-foreground">
+                  Type <span className="text-destructive">*</span>
+                </label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full border border-border bg-background rounded px-3 py-2"
+                  className="w-full border-2 border-border bg-background rounded-md px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                   required
                 >
                   <option value="CLASSROOM">Classroom</option>
@@ -359,13 +410,13 @@ export default function Rooms() {
                     setShowForm(false)
                     setFormData({ room_number: '', type: 'CLASSROOM' })
                   }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded font-medium hover:bg-gray-50"
+                  className="flex-1 px-4 py-2 border-2 border-border bg-background rounded-md font-medium hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded font-medium hover:bg-blue-700"
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
                 >
                   Add Room
                 </button>

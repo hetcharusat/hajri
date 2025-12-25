@@ -46,7 +46,7 @@ export default function OfferingsGlobal() {
         supabase.from('branches').select('id, name, abbreviation').order('name'),
         supabase.from('semesters').select('id, semester_number, branches(name, abbreviation)').order('semester_number'),
         supabase.from('faculty').select('id, name, email, abbr').order('name'),
-        supabase.from('rooms').select('id, room_number, type').order('room_number'),
+        supabase.from('rooms').select('id, room_number, type, department_id').order('room_number'),
       ])
 
       if (branchesRes.error) throw branchesRes.error
@@ -121,7 +121,7 @@ export default function OfferingsGlobal() {
           subjects(code, name, type, semester_id),
           faculty(name, abbr),
           rooms(room_number),
-          batches(batch_letter, classes(semester_id, semesters(semester_number, branches(abbreviation))))
+          batches(batch_letter, classes(semester_id, semesters(semester_number, branches(id, abbreviation, department_id))))
         `)
 
       if (offeringsError) throw offeringsError
@@ -555,6 +555,12 @@ function OfferingRow({ offering, faculty, rooms, onUpdate, onDelete, showSubject
   const [selectedFacultyId, setSelectedFacultyId] = useState(offering.faculty_id || '')
   const [selectedRoomId, setSelectedRoomId] = useState(offering.default_room_id || '')
 
+  // Filter rooms by batch's department
+  const batchDepartmentId = offering.batches?.classes?.semesters?.branches?.department_id
+  const filteredRooms = batchDepartmentId 
+    ? rooms.filter(r => r.department_id === batchDepartmentId)
+    : []
+
   const subjectTypeColors = {
     'LECTURE': 'bg-blue-100 text-blue-800 border-blue-300',
     'LAB': 'bg-purple-100 text-purple-800 border-purple-300',
@@ -608,7 +614,7 @@ function OfferingRow({ offering, faculty, rooms, onUpdate, onDelete, showSubject
               <select
                 value={selectedFacultyId}
                 onChange={(e) => setSelectedFacultyId(e.target.value)}
-                className="flex-1 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 border-2 border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
               >
                 <option value="">Select Faculty...</option>
                 {faculty.map(f => (
@@ -633,10 +639,10 @@ function OfferingRow({ offering, faculty, rooms, onUpdate, onDelete, showSubject
               <select
                 value={selectedRoomId}
                 onChange={(e) => setSelectedRoomId(e.target.value)}
-                className="flex-1 px-2 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 border-2 border-border bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
               >
                 <option value="">Select Room...</option>
-                {rooms.map(r => (
+                {filteredRooms.map(r => (
                   <option key={r.id} value={r.id}>
                     {r.room_number} ({r.type})
                   </option>

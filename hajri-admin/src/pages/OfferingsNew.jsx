@@ -21,7 +21,7 @@ export default function OfferingsNew({ embedded = false }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('batches')
-        .select('id, class_id, classes(semester_id)')
+        .select('id, class_id, classes(semester_id, semesters(branch_id, branches(department_id)))')
         .eq('id', batchId)
         .single()
       if (error) throw error
@@ -31,6 +31,7 @@ export default function OfferingsNew({ embedded = false }) {
   })
 
   const semesterId = batchData?.classes?.semester_id
+  const departmentId = batchData?.classes?.semesters?.branches?.department_id
 
   // Fetch semester subjects
   const { data: subjects = [], isLoading: loadingSubjects } = useQuery({
@@ -60,17 +61,22 @@ export default function OfferingsNew({ embedded = false }) {
     },
   })
 
-  // Fetch rooms (global)
+  // Fetch rooms filtered by batch's department
   const { data: rooms = [] } = useQuery({
-    queryKey: ['rooms'],
+    queryKey: ['rooms', { departmentId }],
     queryFn: async () => {
+      if (!departmentId) return []
+
       const { data, error } = await supabase
         .from('rooms')
         .select('id, room_number, type, capacity')
+        .eq('department_id', departmentId)
         .order('room_number')
+      
       if (error) throw error
       return data || []
     },
+    enabled: !!batchId && !!departmentId,
   })
 
   // Fetch offerings for batch
