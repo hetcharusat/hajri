@@ -76,7 +76,8 @@ export function StudentForm({ open, onClose, node, mode = 'add', onSuccess }) {
       loading={loading}
     >
       {error && (
-        <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-sm text-destructive mb-4">
+        <div className="p-4 rounded-lg bg-destructive/10 border-2 border-destructive text-sm text-destructive mb-4">
+          <div className="font-semibold mb-1">Error</div>
           {error}
         </div>
       )}

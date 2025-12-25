@@ -49,6 +49,8 @@ export default function PeriodTemplates() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(null)
   const [editingPeriodId, setEditingPeriodId] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [isAddingNew, setIsAddingNew] = useState(false)
+  const [newPeriodForm, setNewPeriodForm] = useState({})
 
   const templatesQuery = useQuery({
     queryKey: ['periodTemplates'],
@@ -187,19 +189,39 @@ export default function PeriodTemplates() {
   function handleAddPeriod() {
     if (!effectiveTemplateId) return
     setUiError('')
-
     const maxPeriod = Math.max(...periods.map((p) => p.period_number), 0)
     const nextNumber = maxPeriod + 1
-    const nextSlots = [...periods, {
-      id: newSlotId(),
+    setIsAddingNew(true)
+    setNewPeriodForm({
       period_number: nextNumber,
       name: `Period ${nextNumber}`,
-      start_time: '09:00:00',
-      end_time: '10:00:00',
+      start_time: '09:00',
+      end_time: '10:00',
       is_break: false,
+    })
+  }
+
+  function handleSaveNewPeriod() {
+    if (!effectiveTemplateId) return
+    setUiError('')
+
+    const nextSlots = [...periods, {
+      id: newSlotId(),
+      period_number: Number(newPeriodForm.period_number),
+      name: newPeriodForm.name,
+      start_time: normalizeTimeString(newPeriodForm.start_time),
+      end_time: normalizeTimeString(newPeriodForm.end_time),
+      is_break: Boolean(newPeriodForm.is_break),
     }]
 
     updateSlotsMutation.mutate({ templateId: effectiveTemplateId, slots: nextSlots })
+    setIsAddingNew(false)
+    setNewPeriodForm({})
+  }
+
+  function handleCancelNewPeriod() {
+    setIsAddingNew(false)
+    setNewPeriodForm({})
   }
 
   function handleDeletePeriod(periodId) {
@@ -300,6 +322,7 @@ export default function PeriodTemplates() {
                           e.stopPropagation()
                           handleSetActive(template.id)
                         }}
+                        className="text-foreground hover:text-primary hover:bg-primary/10"
                       >
                         <Check className="h-4 w-4" />
                       </Button>
@@ -312,6 +335,7 @@ export default function PeriodTemplates() {
                         e.stopPropagation()
                         handleDeleteTemplate(template.id)
                       }}
+                      className="text-foreground hover:text-destructive hover:bg-destructive/10"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -334,7 +358,7 @@ export default function PeriodTemplates() {
                 <CardDescription>Slot ordering is controlled by period number; break slots are supported.</CardDescription>
               </div>
               {activeTemplate && (
-                <Button size="sm" onClick={handleAddPeriod} disabled={updateSlotsMutation.isLoading}>
+                <Button size="sm" onClick={handleAddPeriod} disabled={updateSlotsMutation.isLoading || isAddingNew}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Period
                 </Button>
@@ -402,7 +426,7 @@ export default function PeriodTemplates() {
                           </TableCell>
                           <TableCell>
                             <select
-                              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                              className="flex h-10 w-full rounded-md border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                               value={editForm.is_break ? 'break' : 'class'}
                               onChange={(e) => setEditForm({ ...editForm, is_break: e.target.value === 'break' })}
                               disabled={!canEditStructure || updateSlotsMutation.isLoading}
@@ -418,16 +442,18 @@ export default function PeriodTemplates() {
                                 variant="ghost"
                                 onClick={() => handleSavePeriod(period.id)}
                                 disabled={!canEditStructure || updateSlotsMutation.isLoading}
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
                               >
-                                <Check className="h-4 w-4 text-green-600" />
+                                <Check className="h-4 w-4" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={cancelEdit}
                                 disabled={updateSlotsMutation.isLoading}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
-                                <X className="h-4 w-4 text-destructive" />
+                                <X className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -452,6 +478,7 @@ export default function PeriodTemplates() {
                                 variant="ghost"
                                 onClick={() => startEditPeriod(period)}
                                 disabled={updateSlotsMutation.isLoading}
+                                className="text-foreground hover:text-primary hover:bg-primary/10"
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
@@ -460,8 +487,9 @@ export default function PeriodTemplates() {
                                 variant="ghost"
                                 onClick={() => handleDeletePeriod(period.id)}
                                 disabled={updateSlotsMutation.isLoading}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -469,6 +497,75 @@ export default function PeriodTemplates() {
                       )}
                     </TableRow>
                   ))}
+                  {isAddingNew && (
+                    <TableRow>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={newPeriodForm.period_number ?? ''}
+                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, period_number: e.target.value })}
+                          className="w-16"
+                          disabled={updateSlotsMutation.isLoading}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={newPeriodForm.name ?? ''}
+                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, name: e.target.value })}
+                          disabled={updateSlotsMutation.isLoading}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="time"
+                          value={newPeriodForm.start_time ?? ''}
+                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, start_time: e.target.value })}
+                          disabled={updateSlotsMutation.isLoading}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="time"
+                          value={newPeriodForm.end_time ?? ''}
+                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, end_time: e.target.value })}
+                          disabled={updateSlotsMutation.isLoading}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <select
+                          className="flex h-10 w-full rounded-md border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                          value={newPeriodForm.is_break ? 'break' : 'class'}
+                          onChange={(e) => setNewPeriodForm({ ...newPeriodForm, is_break: e.target.value === 'break' })}
+                          disabled={updateSlotsMutation.isLoading}
+                        >
+                          <option value="class">Class</option>
+                          <option value="break">Break</option>
+                        </select>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleSaveNewPeriod}
+                            disabled={updateSlotsMutation.isLoading}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={handleCancelNewPeriod}
+                            disabled={updateSlotsMutation.isLoading}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             )}

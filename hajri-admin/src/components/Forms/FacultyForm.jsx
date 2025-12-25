@@ -267,7 +267,7 @@ export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
       loading={loading}
     >
       {error && (
-        <div className="p-4 rounded-lg bg-destructive/10 border-l-4 border-destructive text-sm text-destructive mb-4 shadow-sm">
+        <div className="p-4 rounded-lg bg-destructive/10 border-2 border-destructive text-sm text-destructive mb-4">
           <div className="font-semibold mb-1">Error</div>
           {error}
         </div>
@@ -314,7 +314,7 @@ export function FacultyForm({ open, onClose, node, mode = 'add', onSuccess }) {
       {schema.supportsDepartmentId && (
         <FormField label="Department (Optional)">
           <select
-            className="flex h-11 w-full rounded-lg border-2 border-input bg-background px-4 py-2.5 text-sm font-medium shadow-sm transition-all hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:border-primary focus-visible:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex h-11 w-full rounded-md border-2 border-border bg-background px-4 py-2.5 text-sm font-medium transition-all hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
             value={formData.department_id || ''}
             onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
             disabled={lockedToDepartment}

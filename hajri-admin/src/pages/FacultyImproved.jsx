@@ -150,9 +150,9 @@ export default function FacultyImproved() {
       )}
 
       {/* Search */}
-      <Card className="p-4">
+      <Card className="p-4 border-2">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
           <Input
             type="text"
             placeholder="Search by name, email, or abbreviation..."
@@ -165,16 +165,16 @@ export default function FacultyImproved() {
 
       {/* Faculty List */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">Loading...</div>
+        <div className="text-center py-12 text-muted-foreground">Loading...</div>
       ) : filteredFaculty.length === 0 ? (
-        <Card className="p-12 text-center text-gray-500">
-          <Users className="mx-auto mb-4 text-gray-400" size={48} />
-          <p>{searchTerm ? 'No faculty members found matching your search' : 'No faculty members yet'}</p>
+        <Card className="p-12 text-center border-2">
+          <Users className="mx-auto mb-4 text-muted-foreground" size={48} />
+          <p className="text-foreground font-medium">{searchTerm ? 'No faculty members found matching your search' : 'No faculty members yet'}</p>
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredFaculty.map(fac => (
-            <Card key={fac.id} className="p-4 hover:shadow-lg transition-shadow">
+            <Card key={fac.id} className="p-4 border-2 hover:shadow-md transition-all">
               <div className="space-y-3">
                 {/* Avatar and Name */}
                 <div className="flex items-center gap-3">
@@ -200,7 +200,7 @@ export default function FacultyImproved() {
                 )}
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-2 border-t">
+                <div className="flex gap-2 pt-2 border-t-2 border-border">
                   <Button
                     size="sm"
                     variant="outline"
@@ -214,7 +214,7 @@ export default function FacultyImproved() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleDelete(fac.id)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 border-2"
                   >
                     <Trash2 size={14} />
                   </Button>
@@ -227,22 +227,22 @@ export default function FacultyImproved() {
 
       {/* Add/Edit Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-gradient-to-br from-purple-900/70 via-blue-900/70 to-indigo-900/70 backdrop-blur-sm flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto border-2 border-primary shadow-2xl bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto border-2 border-primary shadow-2xl bg-card">
             <form onSubmit={handleSubmit}>
               {/* Form Header */}
-              <div className="p-6 border-b-2 border-primary/30 bg-gradient-to-r from-primary via-blue-600 to-indigo-600">
+              <div className="p-6 border-b-2 border-primary/30 bg-primary">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold flex items-center gap-3 text-white drop-shadow-lg">
-                    <GraduationCap className="text-white" size={28} />
+                  <h2 className="text-2xl font-bold flex items-center gap-3 text-primary-foreground">
+                    <GraduationCap className="text-primary-foreground" size={28} />
                     {formData.id ? 'Edit Faculty' : 'Add New Faculty'}
                   </h2>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={() => setShowForm(false)}
-                    className="bg-white/20 border-white/50 text-white hover:bg-white/30 hover:text-white"
+                    className="text-primary-foreground hover:bg-primary-foreground/20"
                   >
                     <X size={18} />
                   </Button>
@@ -250,11 +250,10 @@ export default function FacultyImproved() {
               </div>
 
               {/* Form Body */}
-              <div className="p-6 space-y-6 bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
+              <div className="p-6 space-y-6 bg-card">
                 {/* Name */}
                 <div>
-                  <label className="block text-sm font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                    <span className="w-1.5 h-5 bg-gradient-to-b from-primary to-blue-600 rounded-full"></span>
+                  <label className="block text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
                     <Users size={16} className="text-primary" />
                     Full Name *
                   </label>
@@ -270,8 +269,7 @@ export default function FacultyImproved() {
 
                 {/* Email */}
                 <div>
-                  <label className="block text-sm font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                    <span className="w-1.5 h-5 bg-gradient-to-b from-primary to-blue-600 rounded-full"></span>
+                  <label className="block text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
                     <Mail size={16} className="text-primary" />
                     Email Address
                   </label>
@@ -286,8 +284,7 @@ export default function FacultyImproved() {
 
                 {/* Abbreviation */}
                 <div>
-                  <label className="block text-sm font-bold mb-2 flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                    <span className="w-1.5 h-5 bg-gradient-to-b from-primary to-blue-600 rounded-full"></span>
+                  <label className="block text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
                     Abbreviation / Short Code
                   </label>
                   <Input
@@ -304,25 +301,25 @@ export default function FacultyImproved() {
                 </div>
 
                 {/* Info Box */}
-                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/40 border-l-4 border-amber-500 rounded-lg p-4 shadow-sm">
-                  <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
-                    <strong className="text-amber-900 dark:text-amber-100">💡 Note:</strong> After creating a faculty member, assign them to courses 
+                <div className="bg-warning/10 border-2 border-warning rounded-lg p-4">
+                  <p className="text-sm text-foreground font-medium">
+                    <strong className="text-warning">💡 Note:</strong> After creating a faculty member, assign them to courses 
                     in the <strong className="text-primary">Assignments</strong> tab.
                   </p>
                 </div>
               </div>
 
               {/* Form Footer */}
-              <div className="p-6 border-t-2 border-primary/20 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 flex gap-3 justify-end">
+              <div className="p-6 border-t-2 border-border bg-muted/20 flex gap-3 justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowForm(false)}
-                  className="border-2 border-slate-300 hover:border-primary hover:bg-slate-100"
+                  className="border-2"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-gradient-to-r from-primary via-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold shadow-lg hover:shadow-xl transition-all">
+                <Button type="submit" className="font-bold shadow-lg hover:shadow-xl transition-all">
                   <Check className="mr-2" size={18} />
                   {formData.id ? 'Update Faculty' : 'Create Faculty'}
                 </Button>

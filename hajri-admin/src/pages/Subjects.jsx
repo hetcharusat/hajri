@@ -147,7 +147,7 @@ export default function Subjects() {
         </div>
 
       {!semesterId && (
-        <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-4">
+        <div className="flex items-start gap-3 rounded-lg border-2 border-border bg-muted/30 p-6">
           <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-foreground">Semester scope required</p>
@@ -157,11 +157,11 @@ export default function Subjects() {
       )}
 
         {error && (
-          <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+          <div className="flex items-start gap-3 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
             <AlertCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">Error</p>
-              <p className="text-sm text-muted-foreground">{error}</p>
+              <p className="text-sm font-semibold text-destructive">Error</p>
+              <p className="text-sm text-foreground">{error}</p>
             </div>
           </div>
         )}
@@ -214,7 +214,7 @@ export default function Subjects() {
                     <Label htmlFor="type">Type</Label>
                     <select
                       id="type"
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      className="flex h-10 w-full rounded-md border-2 border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                       value={formData.type}
                       onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     >
@@ -269,7 +269,7 @@ export default function Subjects() {
                   <p>No subjects found. Add your first subject above.</p>
                 </div>
               ) : (
-                <div className="rounded-md border max-h-[600px] overflow-auto">
+                <div className="rounded-md border-2 border-border max-h-[600px] overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -312,7 +312,7 @@ export default function Subjects() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDelete(subject.id)}
-                              className="text-destructive hover:text-destructive"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

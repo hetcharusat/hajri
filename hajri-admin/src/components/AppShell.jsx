@@ -182,8 +182,8 @@ export function AppShell() {
       {/* Left: Tree Explorer (ONLY sidebar) */}
       <aside
         className={cn(
-          'relative shrink-0 border-r border-border bg-card flex flex-col',
-          isResizing ? 'transition-none' : 'transition-[width] duration-200 ease-out'
+          'relative shrink-0 border-r-2 border-border bg-card flex flex-col shadow-sm',
+          isResizing ? 'transition-none' : 'transition-[width] duration-300 ease-out'
         )}
         style={{ width: `${actualSidebarWidth}px` }}
       >
@@ -193,17 +193,18 @@ export function AppShell() {
 
         {/* Floating collapse button at bottom */}
         <div className={cn(
-          "relative z-20 border-t border-border bg-muted/30 backdrop-blur-sm flex items-center justify-center",
+          "relative z-20 border-t-2 border-border bg-muted/40 backdrop-blur-sm flex items-center justify-center",
           collapsed ? "p-2" : "p-3"
         )}>
           <button
             type="button"
             onClick={toggleCollapsed}
             className={cn(
-              'rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all',
+              'rounded-lg p-2 text-foreground hover:bg-secondary hover:text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
               collapsed ? 'w-10 h-10' : 'w-full flex items-center justify-center gap-2'
             )}
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? (
               <ChevronRight className="h-5 w-5" />
@@ -223,19 +224,22 @@ export function AppShell() {
             aria-orientation="vertical"
             onMouseDown={startResize}
             onDoubleClick={resetSidebarWidth}
-            className="absolute top-0 right-0 h-full w-2 cursor-col-resize z-10 hover:bg-primary/20 transition-colors"
+            className="absolute top-0 right-0 h-full w-2 cursor-col-resize z-10 hover:bg-primary/30 transition-colors group"
             title="Drag to resize. Double-click to reset."
-          />
+            aria-label="Resize sidebar"
+          >
+            <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 w-1 h-12 bg-border rounded-full group-hover:bg-primary transition-colors" />
+          </div>
         )}
       </aside>
 
       {/* Right: Workspace */}
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-border bg-card">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2">
+        <header className="border-b-2 border-border bg-card shadow-sm">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
             <Breadcrumb />
 
-            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
               {modes.map((m) => (
                 (() => {
                   const needsSemester = m.to === '/app/subjects' || m.to === '/app/faculty'
@@ -259,10 +263,10 @@ export function AppShell() {
                     : ''
 
                   const baseClass = cn(
-                    'rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap',
+                    'rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-all',
                     disabled
                       ? 'text-muted-foreground/50 cursor-not-allowed'
-                      : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                      : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
                   )
 
                   if (disabled) {
@@ -279,7 +283,7 @@ export function AppShell() {
                       to={m.to}
                       title={title}
                       className={({ isActive }) =>
-                        cn(baseClass, isActive && 'bg-secondary text-foreground')
+                        cn(baseClass, isActive && 'bg-primary/20 text-foreground border-2 border-primary/30 font-semibold')
                       }
                     >
                       {m.label}

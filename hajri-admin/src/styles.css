@@ -33,6 +33,31 @@
     --input: 220.9 39.3% 11%;
     --ring: 217.2 91.2% 59.8%;
     --radius: 0.5rem;
+
+    /* Semantic color tokens */
+    --success: 142 76% 36%; /* #10B981 - Green */
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%; /* #F59E0B - Amber */
+    --warning-foreground: 210 40% 98%;
+    --info: 217.2 91.2% 59.8%; /* #3B82F6 - Blue */
+    --info-foreground: 210 40% 98%;
+
+    /* Border opacity levels */
+    --border-opacity-default: 1;
+    --border-opacity-hover: 0.8;
+    --border-opacity-disabled: 0.3;
+
+    /* Shadow tokens for depth hierarchy */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+    /* Focus ring colors with better contrast */
+    --ring-offset: 224 40.5% 7.3%;
+    --ring-offset-width: 2px;
+    --ring-width: 2px;
   }
 }
 
@@ -42,5 +67,45 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar styling for dark theme */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-card;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+/* Utility classes for semantic colors */
+@layer utilities {
+  .text-success {
+    color: hsl(var(--success));
+  }
+  .bg-success {
+    background-color: hsl(var(--success));
+  }
+  .text-warning {
+    color: hsl(var(--warning));
+  }
+  .bg-warning {
+    background-color: hsl(var(--warning));
+  }
+  .text-info {
+    color: hsl(var(--info));
+  }
+  .bg-info {
+    background-color: hsl(var(--info));
   }
 }

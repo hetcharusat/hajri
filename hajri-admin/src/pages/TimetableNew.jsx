@@ -631,10 +631,10 @@ export default function TimetableNew() {
         </div>
 
         {!batchId && (
-          <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-4">
+          <div className="flex items-start gap-3 rounded-lg border-2 border-border bg-muted/30 p-6">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">Batch scope required</p>
+              <p className="text-sm font-semibold text-foreground">Batch scope required</p>
               <p className="text-sm text-muted-foreground">
                 Select a Batch node in the Tree Explorer to edit a timetable.
               </p>
@@ -643,7 +643,7 @@ export default function TimetableNew() {
         )}
 
         {error && (
-          <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+          <div className="flex items-start gap-3 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
             <div className="flex-1">
               <p className="text-sm font-medium text-destructive">Error</p>
@@ -653,10 +653,10 @@ export default function TimetableNew() {
         )}
 
         {batchId && blockEditingReason && (
-          <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-4">
+          <div className="flex items-start gap-3 rounded-lg border-2 border-border bg-muted/30 p-6">
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">Period template required</p>
+              <p className="text-sm font-semibold text-foreground">Period template required</p>
               <p className="text-sm text-muted-foreground">{blockEditingReason}</p>
             </div>
           </div>
@@ -694,7 +694,7 @@ export default function TimetableNew() {
             </CardHeader>
             <CardContent>
                 {!templateReady ? (
-                  <div className="rounded-lg border border-border bg-muted/10 p-6 text-sm text-muted-foreground">
+                  <div className="rounded-lg border-2 border-border bg-muted/20 p-6 text-sm text-foreground">
                     {blockEditingReason || 'Period template required to render the grid.'}
                   </div>
                 ) : (
@@ -702,7 +702,7 @@ export default function TimetableNew() {
                     <table className="w-full border-collapse min-w-[1200px]">
                       <thead>
                         <tr>
-                          <th className="border-r-2 border-b-2 border-border bg-muted/70 px-4 py-3 text-left text-xs font-bold w-32 sticky left-0 z-10 shadow-md">
+                          <th className="border-r-2 border-b-2 border-border bg-muted/50 px-4 py-3 text-left text-xs font-semibold text-foreground w-32 sticky left-0 z-10 shadow-md">
                             Period
                           </th>
                           {DAYS.map((day) => (

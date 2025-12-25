@@ -13,10 +13,10 @@ import { Plus, Edit2, Trash2 } from 'lucide-react'
 
 function StatCard({ label, value, helper }) {
   return (
-    <Card className="p-4">
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
-      {helper ? <div className="mt-1 text-xs text-muted-foreground">{helper}</div> : null}
+    <Card className="p-6 border-2 hover:shadow-md transition-shadow">
+      <div className="text-sm font-semibold text-muted-foreground mb-2">{label}</div>
+      <div className="mt-1 text-3xl font-bold text-foreground">{value}</div>
+      {helper ? <div className="mt-2 text-xs text-muted-foreground">{helper}</div> : null}
     </Card>
   )
 }
@@ -365,9 +365,9 @@ export default function Overview() {
       </div>
 
       {statsQuery.error ? (
-        <Card className="p-4">
-          <div className="text-sm font-medium text-destructive">Error</div>
-          <div className="mt-1 text-sm text-muted-foreground">{statsQuery.error?.message || 'Failed to load overview'}</div>
+        <Card className="p-4 border-2 border-destructive bg-destructive/10">
+          <div className="text-sm font-semibold text-destructive">Error</div>
+          <div className="mt-1 text-sm text-foreground">{statsQuery.error?.message || 'Failed to load overview'}</div>
         </Card>
       ) : null}
 
@@ -453,7 +453,7 @@ export default function Overview() {
               {(childrenQuery.data || []).map((n) => (
                 <div
                   key={`${n.type}-${n.id}`}
-                  className={cn('rounded-lg border border-border bg-card p-3 group relative')}
+                  className={cn('rounded-lg border-2 border-border bg-card p-4 group relative hover:shadow-md transition-all')}
                 >
                   <button
                     type="button"
@@ -483,10 +483,10 @@ export default function Overview() {
                           setFormData({ batch_letter: parts ? parts[1] : '' })
                         }
                       }}
-                      className="rounded-md bg-card p-1.5 hover:bg-secondary border border-border"
+                      className="rounded-md bg-card p-1.5 hover:bg-secondary border-2 border-border text-foreground hover:text-foreground transition-all"
                       title="Edit"
                     >
-                      <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Edit2 className="h-3.5 w-3.5" />
                     </button>
                     <button
                       type="button"
@@ -494,10 +494,10 @@ export default function Overview() {
                         e.stopPropagation()
                         setDeleteDialog(n)
                       }}
-                      className="rounded-md bg-card p-1.5 hover:bg-destructive/10 border border-border"
+                      className="rounded-md bg-card p-1.5 hover:bg-destructive/10 border-2 border-border text-destructive hover:text-destructive transition-all"
                       title="Delete"
                     >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>

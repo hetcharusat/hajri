@@ -250,9 +250,9 @@ export function TreeNode({ node, level = 0, collapsed = false }) {
         onClick={handleSelect}
         className={cn(
           'w-full flex items-center transition-all duration-200 group',
-          'hover:bg-secondary/80 hover:shadow-sm rounded-lg',
+          'hover:bg-secondary/70 hover:shadow-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
           collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-2.5',
-          isSelected && 'bg-primary/10 shadow-md',
+          isSelected && 'bg-primary/20 shadow-md border-2 border-primary/40',
           !collapsed && isSelected && 'border-l-4 border-primary',
           collapsed && isSelected && 'bg-primary/20',
           level > 0 && 'text-sm',
@@ -260,6 +260,8 @@ export function TreeNode({ node, level = 0, collapsed = false }) {
         )}
         style={{ paddingLeft: collapsed ? undefined : `${level * 20 + 12}px` }}
         title={collapsed ? node.name : undefined}
+        aria-label={`Select ${node.type} ${node.name}`}
+        aria-selected={isSelected}
       >
         {!collapsed && hasChildren && (
           <div
@@ -267,9 +269,9 @@ export function TreeNode({ node, level = 0, collapsed = false }) {
             className="p-1 hover:bg-secondary rounded transition-colors flex-shrink-0 cursor-pointer"
           >
             {isExpanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-foreground" />
             ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              <ChevronRight className="h-4 w-4 text-foreground" />
             )}
           </div>
         )}
@@ -286,7 +288,7 @@ export function TreeNode({ node, level = 0, collapsed = false }) {
               'w-full h-full transition-all duration-200',
               NODE_COLORS[node.type],
               isSelected && 'opacity-100 drop-shadow-sm',
-              !isSelected && 'opacity-70 group-hover:opacity-100'
+              !isSelected && 'opacity-80 group-hover:opacity-100'
             )}
           />
         </div>
