@@ -49,6 +49,5 @@ temp/
 tmp/
 *.tmp
 
-# SQL Queries (local development/sensitive)
-sql-queries/
-**/sql-queries/
+# Note: sql-queries/ used to be ignored but is now tracked for schema versioning
+# Sensitive data should not be stored in SQL files - use environment variables

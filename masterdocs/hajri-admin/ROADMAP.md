@@ -49,18 +49,34 @@
 - **Conflict Detection:** Real-time validation to prevent overlapping schedules.
 - **Performance:** Replaced heavy Framer Motion animations with lightweight CSS transitions.
 - **UI:** High-contrast color coding for LEC/LAB/TUT and cleaner grid layout.
+- **Multiple Scheduling:** Removed gray-out effect - same subject can be scheduled multiple times per week with count badges.
+- **Grid Overflow Fix:** Improved responsive grid layout to prevent label overflow.
 
 ### 2. Offerings Management
 - **Search & Filter:** Added robust filtering by subject type and assignment status.
 - **Stats:** Real-time counters for assigned vs pending offerings.
+- **Enhanced Assignments Tab:** Added search bar, type filters (Theory/Lab/Tutorial), and status filters (Assigned/Pending/Not Created).
 
 ### 3. Academic Calendar
 - **Data:** Integrated CHARUSAT 2025-26 academic calendar.
-- **Fixes:** Resolved UTC date shift issues in calendar display.
+- **Timezone Fix:** Fixed UTC date shift bug - events now display on correct dates using local timezone formatting.
 
 ### 4. UI/UX Refinement
 - **Overview:** Modernized stat cards and navigation tiles.
 - **Theme:** Added success/warning/info semantic colors to Tailwind config.
+- **Dark Theme:** Fixed color contrast issues with opacity-based backgrounds for visibility.
+
+### 5. Security Fixes (NEW)
+- **RLS Policies:** Added Row Level Security to 9 missing tables:
+  - `semester_faculty`, `subject_components`, `offering_teachers`
+  - `event_batches`, `event_rooms`, `faculty_constraints`
+  - `batch_groups`, `batch_group_members`
+- **Function Search Paths:** Fixed 9 functions with mutable search paths:
+  - `get_current_lecture`, `cleanup_old_drafts`, `find_orphaned_offerings`
+  - `is_teaching_day`, `count_teaching_days`, `check_room_conflict`
+  - `check_faculty_conflict`, `update_updated_at_column`, `handle_new_user`
+- **Migration File:** Created `sql-queries/migrations/05-security-fixes.sql`
+- **Views:** Security Definer views kept intentionally for admin bypass functionality.
 - [ ] Open Supabase SQL Editor
 - [ ] Copy CLEAN-SCHEMA.sql contents
 - [ ] Run entire script (drops + creates all tables)

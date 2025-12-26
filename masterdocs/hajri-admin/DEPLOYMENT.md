@@ -111,6 +111,32 @@ WHERE schemaname = 'public';
 -- Should show rowsecurity = true for all tables
 ```
 
+### 2.4 Run Security Migration (Important!)
+
+If you see security warnings in Supabase Dashboard, run this migration:
+
+```sql
+-- Run the security fixes migration
+-- File: sql-queries/migrations/05-security-fixes.sql
+```
+
+**What it fixes:**
+- Enables RLS on 9 tables that were missing it
+- Fixes function search paths for security
+- Adds admin-only policies for data modification
+
+**Tables that get RLS enabled:**
+- `semester_faculty`, `subject_components`, `offering_teachers`
+- `event_batches`, `event_rooms`, `faculty_constraints`
+- `batch_groups`, `batch_group_members`
+
+**Functions that get fixed:**
+- `get_current_lecture`, `cleanup_old_drafts`, `find_orphaned_offerings`
+- `is_teaching_day`, `count_teaching_days`, `check_room_conflict`
+- `check_faculty_conflict`, `update_updated_at_column`, `handle_new_user`
+
+**Note:** Security Definer views are intentionally kept for admin functionality.
+
 ## Step 3: Deploy to Netlify
 
 ### 3.1 Connect GitHub Repository
