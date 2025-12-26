@@ -520,6 +520,60 @@ ON CONFLICT (email) DO NOTHING;
 
 
 -- ============================================
+-- PART 4: Fix SECURITY DEFINER views
+-- Change to SECURITY INVOKER to respect RLS policies
+-- ============================================
+
+-- Fix batch_subjects view
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'batch_subjects') THEN
+    EXECUTE 'ALTER VIEW public.batch_subjects SET (security_invoker = true)';
+  END IF;
+END $$;
+
+-- Fix active_period_schedule view
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'active_period_schedule') THEN
+    EXECUTE 'ALTER VIEW public.active_period_schedule SET (security_invoker = true)';
+  END IF;
+END $$;
+
+-- Fix v_non_teaching_dates view
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'v_non_teaching_dates') THEN
+    EXECUTE 'ALTER VIEW public.v_non_teaching_dates SET (security_invoker = true)';
+  END IF;
+END $$;
+
+-- Fix offerings_complete view
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'offerings_complete') THEN
+    EXECUTE 'ALTER VIEW public.offerings_complete SET (security_invoker = true)';
+  END IF;
+END $$;
+
+-- Fix events_complete view
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'events_complete') THEN
+    EXECUTE 'ALTER VIEW public.events_complete SET (security_invoker = true)';
+  END IF;
+END $$;
+
+-- Fix current_timetables view
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'current_timetables') THEN
+    EXECUTE 'ALTER VIEW public.current_timetables SET (security_invoker = true)';
+  END IF;
+END $$;
+
+
+-- ============================================
 -- VERIFICATION QUERIES (run separately to check)
 -- ============================================
 -- Check RLS status:
