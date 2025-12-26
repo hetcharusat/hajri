@@ -176,7 +176,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'timetable_events') THEN
-    CREATE OR REPLACE FUNCTION public.get_current_lecture(p_batch_id UUID)
+    DROP FUNCTION IF EXISTS public.get_current_lecture(UUID);
+    CREATE FUNCTION public.get_current_lecture(p_batch_id UUID)
     RETURNS TABLE (
       subject_code TEXT,
       subject_name TEXT,
@@ -228,7 +229,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'timetable_versions') THEN
-    CREATE OR REPLACE FUNCTION public.cleanup_old_drafts()
+    DROP FUNCTION IF EXISTS public.cleanup_old_drafts();
+    CREATE FUNCTION public.cleanup_old_drafts()
     RETURNS INTEGER
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -256,7 +258,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'course_offerings') THEN
-    CREATE OR REPLACE FUNCTION public.find_orphaned_offerings()
+    DROP FUNCTION IF EXISTS public.find_orphaned_offerings();
+    CREATE FUNCTION public.find_orphaned_offerings()
     RETURNS TABLE (
       offering_id UUID,
       subject_code TEXT,
@@ -288,7 +291,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_years') THEN
-    CREATE OR REPLACE FUNCTION public.is_teaching_day(check_date DATE, p_academic_year_id UUID DEFAULT NULL)
+    DROP FUNCTION IF EXISTS public.is_teaching_day(DATE, UUID);
+    CREATE FUNCTION public.is_teaching_day(check_date DATE, p_academic_year_id UUID DEFAULT NULL)
     RETURNS BOOLEAN
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -355,7 +359,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_years') THEN
-    CREATE OR REPLACE FUNCTION public.count_teaching_days(start_date DATE, end_date DATE, p_academic_year_id UUID DEFAULT NULL)
+    DROP FUNCTION IF EXISTS public.count_teaching_days(DATE, DATE, UUID);
+    CREATE FUNCTION public.count_teaching_days(start_date DATE, end_date DATE, p_academic_year_id UUID DEFAULT NULL)
     RETURNS INTEGER
     LANGUAGE plpgsql
     SECURITY DEFINER
@@ -385,7 +390,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'timetable_events') THEN
-    CREATE OR REPLACE FUNCTION public.check_room_conflict(
+    DROP FUNCTION IF EXISTS public.check_room_conflict(UUID, INT, TIME, TIME, UUID, UUID);
+    CREATE FUNCTION public.check_room_conflict(
       p_room_id UUID,
       p_day_of_week INT,
       p_start_time TIME,
@@ -422,7 +428,8 @@ END $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'timetable_events') THEN
-    CREATE OR REPLACE FUNCTION public.check_faculty_conflict(
+    DROP FUNCTION IF EXISTS public.check_faculty_conflict(UUID, INT, TIME, TIME, UUID, UUID);
+    CREATE FUNCTION public.check_faculty_conflict(
       p_faculty_id UUID,
       p_day_of_week INT,
       p_start_time TIME,
@@ -457,7 +464,8 @@ END $$;
 
 
 -- Fix update_updated_at_column trigger function (always safe to create)
-CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+DROP FUNCTION IF EXISTS public.update_updated_at_column() CASCADE;
+CREATE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -474,7 +482,8 @@ $$;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users') THEN
-    CREATE OR REPLACE FUNCTION public.handle_new_user()
+    DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
+    CREATE FUNCTION public.handle_new_user()
     RETURNS TRIGGER
     LANGUAGE plpgsql
     SECURITY DEFINER
