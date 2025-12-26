@@ -2,7 +2,7 @@
 
 **Last Updated:** December 26, 2025  
 **Status:** V2 Implementation Phase - Core Features Stabilized  
-**Next Session:** Finalize deployment + User testing
+**Next Session:** Student Elective Selection Feature
 
 ---
 
@@ -11,13 +11,14 @@
 **What to do next (order matters)**
 1. Smoke test the V2 workflow end-to-end
 2. Deploy schema: run `hajri-admin/CLEAN-SCHEMA.sql` in Supabase
-3. Finalize mobile responsiveness for Timetable
+3. Build Student Timetable View with Elective Selection
 
-**Definition of “done” for this milestone**
+**Definition of "done" for this milestone**
 - [x] Can login as admin
 - [x] Can create offerings with search/filter
 - [x] Can paint timetable in Draft (with Lab support)
 - [x] Can publish and view Published timetable
+- [ ] Students can select batch and electives, view personalized timetable
 
 ---
 
@@ -42,9 +43,49 @@
 
 ---
 
+## 🔮 Planned Features (P1)
+
+### Student Timetable View with Elective Selection
+**Status:** 🔴 Not Started  
+**Priority:** High - Required for students to view personalized timetables
+
+**Description:**  
+A public/student-facing page where students can:
+1. Select their Department → Semester → Batch
+2. See all elective subjects available for their batch
+3. Pick their preferred elective for each elective slot
+4. View their personalized timetable (only showing their selected electives)
+
+**Database Ready:**
+- ✅ `student_electives` table exists (stores student → subject mapping)
+- ✅ `subjects.is_elective` boolean flag marks elective subjects
+- ✅ RLS policies allow students to manage their own elective selections
+
+**Implementation Plan:**
+1. Create `/student` route (public, no admin login required)
+2. Build batch selector component (Department → Semester → Batch dropdowns)
+3. Build elective picker component (list electives, allow selection)
+4. Build read-only timetable view filtered to:
+   - All regular (non-elective) subjects for the batch
+   - Only the student's selected electives
+5. Store selections in `student_electives` table (localStorage fallback for anonymous)
+
+**Estimated Effort:** 4-6 hours
+
+---
+
 ## ✨ Recent Improvements (Dec 26, 2025)
 
-### 1. Timetable V2 Overhaul
+### 1. Elective System (Simplified)
+- **Simplified Model:** Removed elective groups - subjects now just have `is_elective` boolean flag.
+- **Stacking Logic:** All elective subjects can stack in the same time slot (students pick one).
+- **Elective LABs:** Fixed LAB stacking - multiple elective LABs can now be placed in the same 2-period slot.
+- **Visual Design:** Orange theme for electives - distinct border, accent bar, and "ELECTIVE" badge.
+- **Elective Filter:** Added filter buttons in timetable sidebar (All | Regular | Elective) with counts.
+- **Database:** `student_electives` table ready for student selections.
+- **Migration:** `sql-queries/migrations/07-simplified-electives.sql`
+
+### 2. Timetable V2 Overhaul
 - **Lab Support:** Automatic 2-hour slot merging for LAB type subjects.
 - **Conflict Detection:** Real-time validation to prevent overlapping schedules.
 - **Performance:** Replaced heavy Framer Motion animations with lightweight CSS transitions.
@@ -52,12 +93,12 @@
 - **Multiple Scheduling:** Removed gray-out effect - same subject can be scheduled multiple times per week with count badges.
 - **Grid Overflow Fix:** Improved responsive grid layout to prevent label overflow.
 
-### 2. Offerings Management
+### 3. Offerings Management
 - **Search & Filter:** Added robust filtering by subject type and assignment status.
 - **Stats:** Real-time counters for assigned vs pending offerings.
-- **Enhanced Assignments Tab:** Added search bar, type filters (Theory/Lab/Tutorial), and status filters (Assigned/Pending/Not Created).
+- **Enhanced Assignments Tab:** Added search bar, type filters (Lecture/Lab/Tutorial), and status filters (Assigned/Pending/Not Created).
 
-### 3. Academic Calendar
+### 4. Academic Calendar
 - **Data:** Integrated CHARUSAT 2025-26 academic calendar.
 - **Timezone Fix:** Fixed UTC date shift bug - events now display on correct dates using local timezone formatting.
 

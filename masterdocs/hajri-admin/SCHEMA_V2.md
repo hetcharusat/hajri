@@ -164,6 +164,7 @@ CREATE TABLE semesters (
 **Relationships:**
 - → `subjects.semester_id`
 - → `classes.semester_id`
+- → `elective_groups.semester_id`
 
 ---
 
@@ -178,6 +179,8 @@ CREATE TABLE subjects (
   name TEXT NOT NULL,
   credits INTEGER DEFAULT 3,
   type TEXT DEFAULT 'LECTURE' CHECK (type IN ('LECTURE', 'LAB', 'TUTORIAL')),
+  is_elective BOOLEAN DEFAULT false,
+  elective_group_id UUID REFERENCES elective_groups(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
   ,UNIQUE(semester_id, code)
@@ -189,8 +192,61 @@ CREATE TABLE subjects (
 - `LAB` - Practical sessions
 - `TUTORIAL` - Discussion/problem-solving
 
+**Elective Support:**
+- `is_elective` - Marks subject as an elective (multiple can share same timeslot)
+- `elective_group_id` - Links to an elective group (required for elective stacking)
+
 **Indexes:**
 - Unique: `(semester_id, code)`
+- `idx_subjects_elective_group(elective_group_id)`
+
+---
+
+#### 5.5. `elective_groups`
+**Purpose:** Groups related elective subjects that can share the same timetable slot
+
+```sql
+CREATE TABLE elective_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  semester_id UUID NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(semester_id, name)
+);
+```
+
+**Key Points:**
+- Multiple elective subjects in the same group can occupy the same timetable slot
+- Each elective group belongs to a semester
+- Students choose one subject per elective group
+
+**Relationships:**
+- ← `subjects.elective_group_id`
+- ← `student_electives.elective_group_id`
+- → `semesters.id`
+
+---
+
+#### 5.6. `student_electives`
+**Purpose:** Tracks which elective subject each student has chosen per group
+
+```sql
+CREATE TABLE student_electives (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  elective_group_id UUID NOT NULL REFERENCES elective_groups(id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(student_id, elective_group_id)
+);
+```
+
+**Key Points:**
+- Enforces one choice per elective group per student
+- Used by mobile app to filter timetable display to show only chosen electives
 
 ---
 
@@ -384,16 +440,21 @@ CREATE TABLE timetable_events (
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   room_id UUID REFERENCES rooms(id) ON DELETE SET NULL,
+  elective_group_id UUID REFERENCES elective_groups(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (version_id, day_of_week, start_time),
   CHECK (end_time > start_time)
 );
 ```
 
 **Key Constraints:**
-- **Unique(version, day, start_time):** Enables upsert-based "paint" workflow
 - **CHECK(end_time > start_time):** Prevents invalid slots
+- **Slot Uniqueness:** Enforced by `validate_timetable_event` trigger (not UNIQUE constraint)
+
+**Elective Stacking Rules (enforced by trigger):**
+- Regular subjects: Only one event per slot (version + day + time)
+- Elective subjects: Multiple events allowed if ALL share the same `elective_group_id`
+- Mixed stacking (regular + elective, or different elective groups) is blocked
 
 **Day Mapping:**
 - `0` = Monday
@@ -411,6 +472,7 @@ CREATE TABLE timetable_events (
 **Indexes:**
 - `idx_tt_events_version` on `version_id`
 - `idx_tt_events_day` on `day_of_week`
+- `idx_tt_events_elective_group` on `elective_group_id`
 
 ---
 
@@ -760,6 +822,65 @@ CREATE TRIGGER on_auth_user_created
 ```
 
 **Security:** `SECURITY DEFINER` allows function to bypass RLS
+
+---
+
+### 2.5. `validate_timetable_event()`
+**Purpose:** Enforce elective stacking rules on timetable events
+
+```sql
+CREATE OR REPLACE FUNCTION validate_timetable_event()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_existing_event RECORD;
+  v_new_is_elective BOOLEAN;
+  v_existing_is_elective BOOLEAN;
+BEGIN
+  -- Check for existing event at same slot
+  SELECT te.id, te.elective_group_id, s.is_elective
+  INTO v_existing_event
+  FROM timetable_events te
+  JOIN course_offerings co ON te.offering_id = co.id
+  JOIN subjects s ON co.subject_id = s.id
+  WHERE te.version_id = NEW.version_id
+    AND te.day_of_week = NEW.day_of_week
+    AND te.start_time = NEW.start_time
+    AND te.id != COALESCE(NEW.id, '...')
+  LIMIT 1;
+  
+  IF v_existing_event IS NULL THEN RETURN NEW; END IF;
+  
+  -- Get is_elective for new event
+  SELECT s.is_elective INTO v_new_is_elective
+  FROM course_offerings co
+  JOIN subjects s ON co.subject_id = s.id
+  WHERE co.id = NEW.offering_id;
+  
+  -- Rule: Both must be electives from same group
+  IF NOT v_new_is_elective OR NOT v_existing_event.is_elective THEN
+    RAISE EXCEPTION 'Cannot place multiple events unless both are electives from same group';
+  END IF;
+  
+  IF v_existing_event.elective_group_id != NEW.elective_group_id THEN
+    RAISE EXCEPTION 'Elective subjects must belong to the same group to share a slot';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Trigger:**
+```sql
+CREATE TRIGGER validate_timetable_event_trigger
+  BEFORE INSERT OR UPDATE ON timetable_events
+  FOR EACH ROW EXECUTE FUNCTION validate_timetable_event();
+```
+
+**Rules Enforced:**
+1. Regular subjects: Only one event per slot
+2. Elective subjects: Can stack if they share the same `elective_group_id`
+3. Mixed stacking (regular + elective) is blocked
 
 ---
 

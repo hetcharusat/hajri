@@ -38,7 +38,8 @@ import {
   Search,
   X,
   Check,
-  Save
+  Save,
+  Shuffle
 } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
@@ -300,14 +301,15 @@ function DraggableOffering({ offering, isDragging, index, scheduledCount = 0 }) 
   const componentType = offering.subjects?.type || 'LECTURE'
   const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
   const TypeIcon = config.icon
+  const isElective = offering.subjects?.is_elective
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
         'relative rounded-lg border-2 p-2.5 cursor-grab active:cursor-grabbing select-none shadow-sm hover:shadow-md transition-all min-w-0',
-        config.bg,
-        config.border,
+        isElective ? 'bg-orange-500/10 border-orange-500/40' : config.bg,
+        !isElective && config.border,
         dragging && 'opacity-50 shadow-lg'
       )}
       style={{
@@ -317,10 +319,17 @@ function DraggableOffering({ offering, isDragging, index, scheduledCount = 0 }) 
       {...attributes}
     >
       {/* Left accent bar */}
-      <div className={cn('absolute left-0 top-2 bottom-2 w-1 rounded-full', config.accent)} />
+      <div className={cn('absolute left-0 top-2 bottom-2 w-1 rounded-full', isElective ? 'bg-orange-500' : config.accent)} />
       
       {/* Header with type badge */}
       <div className="flex items-center gap-1 pl-2 flex-wrap">
+        {/* Elective Badge - show first for electives */}
+        {isElective && (
+          <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 bg-orange-500/30 text-orange-300">
+            <Shuffle className="h-2.5 w-2.5" />
+            ELECTIVE
+          </span>
+        )}
         <span className={cn(
           'inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0',
           config.badgeBg, config.badgeText
@@ -329,7 +338,7 @@ function DraggableOffering({ offering, isDragging, index, scheduledCount = 0 }) 
           {config.label}
         </span>
         {componentType === 'LAB' && (
-          <span className="text-[9px] px-1 py-0.5 rounded-full bg-orange-500/30 text-orange-300 font-semibold shrink-0">
+          <span className="text-[9px] px-1 py-0.5 rounded-full bg-purple-500/30 text-purple-300 font-semibold shrink-0">
             2h
           </span>
         )}
@@ -341,7 +350,7 @@ function DraggableOffering({ offering, isDragging, index, scheduledCount = 0 }) 
       </div>
       
       {/* Subject Code */}
-      <div className={cn('font-mono text-xs font-bold pl-2 mt-1.5 truncate', config.text)}>
+      <div className={cn('font-mono text-xs font-bold pl-2 mt-1.5 truncate', isElective ? 'text-orange-400' : config.text)}>
         {offering.subjects?.code}
       </div>
       
@@ -490,6 +499,200 @@ function TimetableBlock({ event, onEdit, onDelete, viewMode, rowSpan = 1 }) {
           >
             <Trash2 className="h-3 w-3" />
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Elective Stack Block - displays multiple electives in same slot
+function ElectiveStackBlock({ events, onEdit, onDelete, viewMode, rowSpan = 1 }) {
+  const [expanded, setExpanded] = useState(false)
+  
+  // Single elective - show similar to TimetableBlock but with orange elective theme
+  if (events.length === 1) {
+    const ev = events[0]
+    const off = ev.course_offerings
+    const code = off?.subjects?.code
+    const name = off?.subjects?.name
+    const facultyName = off?.faculty?.name
+    const roomNum = ev.rooms?.room_number
+    const componentType = off?.subjects?.type || 'LECTURE'
+    const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
+    const TypeIcon = config.icon
+    
+    return (
+      <div className={cn(
+        'group relative h-full rounded-lg border-2 p-2 flex flex-col overflow-hidden',
+        'bg-orange-500/10 border-orange-500/40'
+      )}>
+        {/* Left accent bar */}
+        <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500" />
+        
+        {/* Elective badge + Type indicator */}
+        <div className="flex items-center gap-1.5 mb-1 pl-2.5">
+          <span className="inline-flex items-center gap-0.5 text-[8px] font-bold px-1 py-0.5 rounded bg-orange-500/30 text-orange-300 border border-orange-500/30">
+            <Shuffle className="h-2 w-2" />
+            ELECTIVE
+          </span>
+          <span className={cn(
+            'inline-flex items-center gap-0.5 text-[8px] font-bold px-1 py-0.5 rounded',
+            config.badgeBg, config.badgeText
+          )}>
+            <TypeIcon className="h-2 w-2" />
+            {componentType}
+          </span>
+        </div>
+        
+        {/* Subject code and name */}
+        <div className="pl-2.5">
+          <div className={cn('font-mono text-sm font-bold', config.text)}>{code}</div>
+          <div className="text-[10px] text-foreground/70 truncate">{name}</div>
+        </div>
+        
+        {/* Room and Faculty */}
+        <div className="mt-auto pt-1 pl-2.5 space-y-0.5">
+          {roomNum && (
+            <div className="text-[9px] text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-2.5 w-2.5" /> {roomNum}
+            </div>
+          )}
+          {facultyName && (
+            <div className="text-[9px] text-muted-foreground flex items-center gap-1">
+              <User className="h-2.5 w-2.5" /> {facultyName}
+            </div>
+          )}
+        </div>
+        
+        {/* Edit/Delete buttons on hover */}
+        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+          <button
+            onClick={() => onEdit(ev)}
+            className="p-1 rounded bg-background/80 hover:bg-background text-xs"
+          >
+            <Edit2 className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => onDelete(ev.id)}
+            className="p-1 rounded bg-background/80 hover:bg-destructive hover:text-destructive-foreground text-xs"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+  
+  // Multiple electives - stacked view
+  const groupName = 'Electives'
+  
+  return (
+    <div className={cn(
+      'group relative h-full rounded-lg border-2 p-2 flex flex-col overflow-hidden',
+      'bg-orange-500/10 border-orange-500/40'
+    )}>
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-orange-500" />
+      
+      {/* Header with elective label */}
+      <div className="flex items-center justify-between pl-2.5 mb-1">
+        <div className="flex items-center gap-1.5">
+          <Shuffle className="h-3.5 w-3.5 text-orange-500" />
+          <span className="text-[10px] font-bold text-orange-400 uppercase">{groupName}</span>
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-300">
+            {events.length} options
+          </span>
+        </div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[10px] text-muted-foreground hover:text-foreground px-1"
+        >
+          {expanded ? '▲' : '▼'}
+        </button>
+      </div>
+      
+      {/* Compact view - show all codes in a row */}
+      {!expanded && (
+        <div className="flex flex-wrap gap-1 pl-2.5">
+          {events.map(ev => {
+            const code = ev.course_offerings?.subjects?.code
+            const componentType = ev.course_offerings?.subjects?.type || 'LECTURE'
+            const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
+            return (
+              <span
+                key={ev.id}
+                className={cn(
+                  'text-[10px] font-mono font-bold px-1.5 py-0.5 rounded',
+                  config.bg, config.text
+                )}
+                title={`${ev.course_offerings?.subjects?.name} - ${ev.rooms?.room_number || 'No room'}`}
+              >
+                {code}
+              </span>
+            )
+          })}
+        </div>
+      )}
+      
+      {/* Expanded view - show all elective details */}
+      {expanded && (
+        <div className="flex-1 overflow-y-auto space-y-1 pl-2.5 pr-1 mt-1">
+          {events.map(ev => {
+            const off = ev.course_offerings
+            const code = off?.subjects?.code
+            const name = off?.subjects?.name
+            const facultyName = off?.faculty?.name
+            const roomNum = ev.rooms?.room_number
+            const componentType = off?.subjects?.type || 'LECTURE'
+            const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
+            const TypeIcon = config.icon
+            
+            return (
+              <div
+                key={ev.id}
+                className={cn(
+                  'rounded border p-1.5 relative group/item',
+                  config.bg, config.border
+                )}
+              >
+                <div className="flex items-center gap-1">
+                  <span className={cn(
+                    'inline-flex items-center gap-0.5 text-[8px] font-bold px-1 py-0.5 rounded',
+                    config.badgeBg, config.badgeText
+                  )}>
+                    <TypeIcon className="h-2 w-2" />
+                  </span>
+                  <span className={cn('font-mono text-[10px] font-bold', config.text)}>{code}</span>
+                  {roomNum && (
+                    <span className="text-[9px] text-muted-foreground ml-auto flex items-center gap-0.5">
+                      <MapPin className="h-2.5 w-2.5" />
+                      {roomNum}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[9px] text-foreground/70 truncate mt-0.5">{name}</div>
+                <div className="text-[8px] text-muted-foreground truncate">{facultyName || 'TBA'}</div>
+                
+                {/* Edit/Delete for this elective */}
+                {viewMode === 'draft' && (
+                  <div className="absolute top-0.5 right-0.5 flex gap-0.5 opacity-0 group-hover/item:opacity-100">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onEdit(ev) }}
+                      className="w-5 h-5 rounded bg-secondary/80 flex items-center justify-center hover:bg-secondary"
+                    >
+                      <Edit2 className="h-2.5 w-2.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(ev.id) }}
+                      className="w-5 h-5 rounded bg-destructive/80 text-white flex items-center justify-center hover:bg-destructive"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
@@ -692,7 +895,7 @@ export default function TimetableNew() {
       if (!supabase) throw new Error('Supabase not configured')
       const res = await supabase
         .from('course_offerings')
-        .select(`*, subjects(code, name, type), faculty(name), rooms:default_room_id(room_number)`)
+        .select(`*, subjects(code, name, type, is_elective), faculty(name), rooms:default_room_id(room_number)`)
         .eq('batch_id', batchId)
         .order('created_at', { ascending: false })
       if (res.error) throw res.error
@@ -707,7 +910,7 @@ export default function TimetableNew() {
       if (!supabase) throw new Error('Supabase not configured')
       const res = await supabase
         .from('timetable_events')
-        .select(`id, version_id, offering_id, day_of_week, start_time, end_time, room_id, rooms:room_id(room_number), course_offerings(*, subjects(code, name, type), faculty(name))`)
+        .select(`id, version_id, offering_id, day_of_week, start_time, end_time, room_id, rooms:room_id(room_number), course_offerings(*, subjects(code, name, type, is_elective), faculty(name))`)
         .eq('version_id', activeVersionId)
       if (res.error) throw res.error
       return res.data || []
@@ -734,6 +937,7 @@ export default function TimetableNew() {
 
   // State for assignment filter
   const [assignmentFilter, setAssignmentFilter] = useState('ALL') // 'ALL', 'UNASSIGNED', 'ASSIGNED'
+  const [electiveFilter, setElectiveFilter] = useState('ALL') // 'ALL', 'ELECTIVE', 'REGULAR'
 
   // Filter offerings
   const filteredOfferings = useMemo(() => {
@@ -742,6 +946,13 @@ export default function TimetableNew() {
     // Filter by type
     if (typeFilter !== 'ALL') {
       filtered = filtered.filter(o => (o.subjects?.type || 'LECTURE') === typeFilter)
+    }
+    
+    // Filter by elective status
+    if (electiveFilter === 'ELECTIVE') {
+      filtered = filtered.filter(o => o.subjects?.is_elective)
+    } else if (electiveFilter === 'REGULAR') {
+      filtered = filtered.filter(o => !o.subjects?.is_elective)
     }
     
     // Filter by assignment status
@@ -761,7 +972,7 @@ export default function TimetableNew() {
     }
     
     return filtered
-  }, [offerings, typeFilter, searchQuery, assignmentFilter, assignedOfferingIds])
+  }, [offerings, typeFilter, electiveFilter, searchQuery, assignmentFilter, assignedOfferingIds])
 
   // Type counts
   const typeCounts = useMemo(() => ({
@@ -769,6 +980,13 @@ export default function TimetableNew() {
     LECTURE: offerings.filter(o => (o.subjects?.type || 'LECTURE') === 'LECTURE').length,
     LAB: offerings.filter(o => o.subjects?.type === 'LAB').length,
     TUTORIAL: offerings.filter(o => o.subjects?.type === 'TUTORIAL').length,
+  }), [offerings])
+
+  // Elective counts
+  const electiveCounts = useMemo(() => ({
+    ALL: offerings.length,
+    ELECTIVE: offerings.filter(o => o.subjects?.is_elective).length,
+    REGULAR: offerings.filter(o => !o.subjects?.is_elective).length,
   }), [offerings])
 
   // Assignment counts
@@ -786,19 +1004,22 @@ export default function TimetableNew() {
       : null
 
   const placeEventMutation = useMutation({
-    mutationFn: async ({ versionId, offeringId, dayIdx, startTime, endTime, roomId }) => {
+    mutationFn: async ({ versionId, offeringId, dayIdx, startTime, endTime, roomId, isElectiveStacking }) => {
       if (!supabase) throw new Error('Supabase not configured')
       if (!versionId) throw new Error('No active timetable version')
 
       const normalizedStart = normalizeTimeString(startTime)
       const normalizedEnd = normalizeTimeString(endTime)
 
-      await supabase
-        .from('timetable_events')
-        .delete()
-        .eq('version_id', versionId)
-        .eq('day_of_week', dayIdx)
-        .eq('start_time', normalizedStart)
+      // Only delete existing event if NOT stacking electives
+      if (!isElectiveStacking) {
+        await supabase
+          .from('timetable_events')
+          .delete()
+          .eq('version_id', versionId)
+          .eq('day_of_week', dayIdx)
+          .eq('start_time', normalizedStart)
+      }
 
       const ins = await supabase.from('timetable_events').insert([{
         version_id: versionId,
@@ -926,11 +1147,30 @@ export default function TimetableNew() {
       return
     }
 
+    // Get elective info for the dragged offering
+    const isElective = offeringData.subjects?.is_elective || false
+
     // Check if this slot is occupied (including by spanning events)
     const slotOccupied = isSlotOccupied(dayIdx, period.start_time, period.end_time, events)
+    
     if (slotOccupied) {
-      setError(`Slot already occupied by ${slotOccupied.course_offerings?.subjects?.code || 'another offering'}`)
-      return
+      // Check if we can stack electives
+      const occupiedIsElective = slotOccupied.course_offerings?.subjects?.is_elective || false
+      
+      // Allow stacking if both are electives
+      const canStack = isElective && occupiedIsElective
+      
+      if (!canStack) {
+        if (occupiedIsElective && !isElective) {
+          setError(`Slot has elective subjects. Cannot add regular subject.`)
+        } else if (!occupiedIsElective && isElective) {
+          setError(`Slot has a regular subject. Cannot add elective.`)
+        } else {
+          setError(`Slot already occupied by ${slotOccupied.course_offerings?.subjects?.code || 'another offering'}`)
+        }
+        return
+      }
+      // If canStack is true, we allow adding to this slot
     }
 
     // Determine subject type and calculate end time
@@ -961,8 +1201,13 @@ export default function TimetableNew() {
       // Check if next slot is occupied (including by spanning events)
       const nextSlotOccupied = isSlotOccupied(dayIdx, nextPeriod.start_time, nextPeriod.end_time, events)
       if (nextSlotOccupied) {
-        setError(`Lab requires 2 consecutive periods. Next slot is occupied by ${nextSlotOccupied.course_offerings?.subjects?.code || 'another offering'}.`)
-        return
+        // For elective labs, check if occupied slot is also an elective
+        const nextIsElective = nextSlotOccupied.course_offerings?.subjects?.is_elective || false
+        if (!isElective || !nextIsElective) {
+          setError(`Lab requires 2 consecutive periods. Next slot is occupied by ${nextSlotOccupied.course_offerings?.subjects?.code || 'another offering'}.`)
+          return
+        }
+        // Both are electives - allow stacking
       }
 
       // Use next period's end time for 2-hour duration
@@ -970,6 +1215,9 @@ export default function TimetableNew() {
       periodName = `${period.name} + ${nextPeriod.name}`
       isLabMerge = true
     }
+
+    // Determine if this is an elective stacking scenario
+    const isElectiveStacking = isElective && slotOccupied
 
     // Reset selected room and open dialog
     setSelectedRoomId(offeringData.default_room_id || null)
@@ -984,6 +1232,8 @@ export default function TimetableNew() {
       startTime: period.start_time,
       endTime,
       isLabMerge,
+      isElective,
+      isElectiveStacking,
     })
   }
 
@@ -994,11 +1244,11 @@ export default function TimetableNew() {
 
   async function saveWithRoom() {
     if (!roomPickDialog || !activeVersionId) return
-    const { offeringId, dayIdx, startTime, endTime } = roomPickDialog
+    const { offeringId, dayIdx, startTime, endTime, isElectiveStacking } = roomPickDialog
 
     setError('')
     placeEventMutation.mutate(
-      { versionId: activeVersionId, offeringId, dayIdx, startTime, endTime, roomId: selectedRoomId || null },
+      { versionId: activeVersionId, offeringId, dayIdx, startTime, endTime, roomId: selectedRoomId || null, isElectiveStacking },
       { onSuccess: () => {
         setRoomPickDialog(null)
         setSelectedRoomId(null)
@@ -1044,9 +1294,10 @@ export default function TimetableNew() {
     return <Navigate to="/app/overview" replace />
   }
 
-  // Build eventsByCell - maps each cell to the event that occupies it
+  // Build eventsByCell - maps each cell to events that occupy it
   // For multi-slot events (labs), mark all spanned cells
-  const eventsByCell = {}
+  // For electives, multiple events can share the same cell
+  const eventsByCell = {} // key -> array of events
   const eventSpanInfo = {} // Track which events span multiple rows
   
   for (const ev of events) {
@@ -1058,8 +1309,14 @@ export default function TimetableNew() {
     
     // Store span info for the primary cell (first slot)
     const primaryKey = cellKey(ev.day_of_week, ev.start_time)
-    eventsByCell[primaryKey] = ev
-    eventSpanInfo[primaryKey] = { rowSpan, isPrimary: true }
+    
+    // Initialize array if needed and push event
+    if (!eventsByCell[primaryKey]) eventsByCell[primaryKey] = []
+    eventsByCell[primaryKey].push(ev)
+    
+    // Store span info per event
+    if (!eventSpanInfo[primaryKey]) eventSpanInfo[primaryKey] = {}
+    eventSpanInfo[primaryKey][ev.id] = { rowSpan, isPrimary: true }
     
     // Mark spanned cells (for multi-slot events like labs)
     if (rowSpan > 1) {
@@ -1075,8 +1332,10 @@ export default function TimetableNew() {
           if (spanCount > 1) {
             // This is a spanned cell (not the primary)
             const spannedKey = cellKey(ev.day_of_week, slot.start_time)
-            eventsByCell[spannedKey] = ev
-            eventSpanInfo[spannedKey] = { rowSpan: 0, isPrimary: false, primaryKey }
+            if (!eventsByCell[spannedKey]) eventsByCell[spannedKey] = []
+            eventsByCell[spannedKey].push(ev)
+            if (!eventSpanInfo[spannedKey]) eventSpanInfo[spannedKey] = {}
+            eventSpanInfo[spannedKey][ev.id] = { rowSpan: 0, isPrimary: false, primaryKey }
           }
         }
       }
@@ -1225,6 +1484,37 @@ export default function TimetableNew() {
                     </button>
                   ))}
                 </div>
+
+                {/* Elective Filter */}
+                {electiveCounts.ELECTIVE > 0 && (
+                  <div className="flex items-center gap-1 text-xs bg-muted/50 rounded-lg p-1">
+                    {[
+                      { key: 'ALL', label: 'All', color: 'bg-primary' },
+                      { key: 'REGULAR', label: 'Regular', color: 'bg-slate-600' },
+                      { key: 'ELECTIVE', label: 'Elective', color: 'bg-orange-500' },
+                    ].map(({ key, label, color }) => (
+                      <button
+                        key={key}
+                        onClick={() => setElectiveFilter(key)}
+                        className={cn(
+                          "px-2 py-1 rounded transition-colors flex items-center gap-1",
+                          electiveFilter === key 
+                            ? `${color} text-white`
+                            : 'text-muted-foreground hover:bg-muted'
+                        )}
+                      >
+                        {key === 'ELECTIVE' && <Shuffle className="h-3 w-3" />}
+                        {label}
+                        <span className={cn(
+                          "text-[10px] px-1 rounded-full",
+                          electiveFilter === key ? 'bg-white/20' : 'bg-muted'
+                        )}>
+                          {electiveCounts[key]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 
                 {/* Search */}
                 <div className="relative">
@@ -1349,7 +1639,7 @@ export default function TimetableNew() {
                         {/* Day Cells for this Period */}
                         {DAYS.map((_, dayIdx) => {
                           const key = cellKey(dayIdx, period.start_time)
-                          const ev = eventsByCell[key]
+                          const cellEvents = eventsByCell[key] || []
                           const spanInfo = eventSpanInfo[key]
                           const isOver = overId === key
                           const isLastDay = dayIdx === 5
@@ -1368,12 +1658,23 @@ export default function TimetableNew() {
                             return currentPeriodIndex === overPeriodIndex + 1
                           })()
                           
-                          // If this cell is covered by a spanning event (not primary), skip rendering
-                          if (spanInfo && !spanInfo.isPrimary) {
+                          // If ALL events in this cell are non-primary (spanning from previous slot), skip rendering
+                          // This handles both single LABs and stacked elective LABs
+                          const allNonPrimary = cellEvents.length > 0 && cellEvents.every(ev => {
+                            const info = spanInfo?.[ev.id]
+                            return info && !info.isPrimary
+                          })
+                          if (allNonPrimary) {
                             return null // Cell is merged - don't render
                           }
                           
-                          const rowSpan = spanInfo?.rowSpan || 1
+                          // Get rowSpan from first primary event
+                          const primaryEvent = cellEvents.find(ev => spanInfo?.[ev.id]?.isPrimary)
+                          const rowSpan = primaryEvent ? (spanInfo?.[primaryEvent.id]?.rowSpan || 1) : 1
+                          
+                          // Check if this is an elective slot (multiple events, or single elective)
+                          const hasElective = cellEvents.some(ev => ev.course_offerings?.subjects?.is_elective)
+                          const isElectiveSlot = cellEvents.length > 1 || (cellEvents.length === 1 && hasElective)
                           
                           // Break cell
                           if (period.is_break) {
@@ -1407,17 +1708,27 @@ export default function TimetableNew() {
                               <DroppableCell 
                                 cellId={key} 
                                 isOver={isOver || isLabDragNextSlot} 
-                                hasEvent={Boolean(ev)}
+                                hasEvent={cellEvents.length > 0}
                                 isLabSecondSlot={isLabDragNextSlot}
                               >
-                                {ev ? (
-                                  <TimetableBlock
-                                    event={ev}
-                                    viewMode={viewMode}
-                                    onEdit={(e) => setEditDialog({ event: e })}
-                                    onDelete={handleDelete}
-                                    rowSpan={rowSpan}
-                                  />
+                                {cellEvents.length > 0 ? (
+                                  isElectiveSlot ? (
+                                    <ElectiveStackBlock
+                                      events={cellEvents}
+                                      viewMode={viewMode}
+                                      onEdit={(e) => setEditDialog({ event: e })}
+                                      onDelete={handleDelete}
+                                      rowSpan={rowSpan}
+                                    />
+                                  ) : (
+                                    <TimetableBlock
+                                      event={cellEvents[0]}
+                                      viewMode={viewMode}
+                                      onEdit={(e) => setEditDialog({ event: e })}
+                                      onDelete={handleDelete}
+                                      rowSpan={rowSpan}
+                                    />
+                                  )
                                 ) : (
                                   <EmptySlot isLabDragNextSlot={isLabDragNextSlot} />
                                 )}
@@ -1485,10 +1796,21 @@ export default function TimetableNew() {
                           2 Hours
                         </Badge>
                       )}
+                      {roomPickDialog.isElective && (
+                        <Badge variant="outline" className="text-[10px] bg-orange-500/10 text-orange-600 border-orange-500/30">
+                          <Shuffle className="h-2.5 w-2.5 mr-1" />
+                          Elective
+                        </Badge>
+                      )}
                     </div>
                     {roomPickDialog.isLabMerge && (
                       <div className="text-xs bg-purple-500/10 text-purple-600 px-2 py-1.5 rounded-md border border-purple-500/20">
                         ⚗️ Lab will occupy 2 consecutive periods
+                      </div>
+                    )}
+                    {roomPickDialog.isElectiveStacking && (
+                      <div className="text-xs bg-orange-500/10 text-orange-600 px-2 py-1.5 rounded-md border border-orange-500/20">
+                        🔀 Adding another elective to this time slot
                       </div>
                     )}
                   </>

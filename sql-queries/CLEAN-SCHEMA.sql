@@ -86,6 +86,20 @@ CREATE TABLE semesters (
 );
 
 -- ===================================================================
+-- 3.5. ELECTIVE GROUPS (Groups of elective subjects that share time slots)
+-- ===================================================================
+
+CREATE TABLE elective_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  semester_id UUID NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(semester_id, name)
+);
+
+-- ===================================================================
 -- 4. SUBJECTS (Courses for a specific semester)
 -- ===================================================================
 
@@ -96,6 +110,8 @@ CREATE TABLE subjects (
   name TEXT NOT NULL,
   credits INTEGER DEFAULT 3,
   type TEXT DEFAULT 'LECTURE' CHECK (type IN ('LECTURE', 'LAB', 'TUTORIAL')),
+  is_elective BOOLEAN DEFAULT false,
+  elective_group_id UUID REFERENCES elective_groups(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(semester_id, code)
@@ -181,6 +197,20 @@ CREATE TABLE student_backups (
 );
 
 -- ===================================================================
+-- 10.5. STUDENT ELECTIVES (Student's chosen elective per group)
+-- ===================================================================
+
+CREATE TABLE student_electives (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  elective_group_id UUID NOT NULL REFERENCES elective_groups(id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(student_id, elective_group_id)
+);
+
+-- ===================================================================
 -- 11. COURSE OFFERINGS (Subject + Batch + Faculty + Default Room)
 -- ===================================================================
 
@@ -215,6 +245,8 @@ CREATE TABLE timetable_versions (
 
 -- ===================================================================
 -- 13. TIMETABLE EVENTS (Scheduled slots)
+-- Note: UNIQUE constraint removed to allow multiple electives in same slot
+-- Validation is handled by trigger function
 -- ===================================================================
 
 CREATE TABLE timetable_events (
@@ -225,9 +257,9 @@ CREATE TABLE timetable_events (
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
   room_id UUID REFERENCES rooms(id) ON DELETE SET NULL,
+  elective_group_id UUID REFERENCES elective_groups(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (version_id, day_of_week, start_time),
   CHECK (end_time > start_time)
 );
 
@@ -299,6 +331,13 @@ CREATE INDEX idx_timetable_subject ON timetable_entries(subject_id);
 CREATE INDEX idx_timetable_batch ON timetable_entries(batch_id);
 CREATE INDEX idx_timetable_day ON timetable_entries(day_of_week);
 
+-- Elective indexes
+CREATE INDEX idx_elective_groups_semester ON elective_groups(semester_id);
+CREATE INDEX idx_subjects_elective_group ON subjects(elective_group_id);
+CREATE INDEX idx_student_electives_student ON student_electives(student_id);
+CREATE INDEX idx_student_electives_group ON student_electives(elective_group_id);
+CREATE INDEX idx_tt_events_elective_group ON timetable_events(elective_group_id);
+
 -- ===================================================================
 -- TRIGGERS
 -- ===================================================================
@@ -325,6 +364,8 @@ DROP TRIGGER IF EXISTS update_timetable_events_updated_at ON timetable_events;
 DROP TRIGGER IF EXISTS update_period_templates_updated_at ON period_templates;
 DROP TRIGGER IF EXISTS update_academic_calendar_updated_at ON academic_calendar;
 DROP TRIGGER IF EXISTS update_timetable_entries_updated_at ON timetable_entries;
+DROP TRIGGER IF EXISTS update_elective_groups_updated_at ON elective_groups;
+DROP TRIGGER IF EXISTS update_student_electives_updated_at ON student_electives;
 
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_departments_updated_at BEFORE UPDATE ON departments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -340,6 +381,8 @@ CREATE TRIGGER update_timetable_events_updated_at BEFORE UPDATE ON timetable_eve
 CREATE TRIGGER update_period_templates_updated_at BEFORE UPDATE ON period_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_academic_calendar_updated_at BEFORE UPDATE ON academic_calendar FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_timetable_entries_updated_at BEFORE UPDATE ON timetable_entries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_elective_groups_updated_at BEFORE UPDATE ON elective_groups FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_student_electives_updated_at BEFORE UPDATE ON student_electives FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ===================================================================
 -- AUTH TRIGGER (Auto-create user row on signup)
@@ -359,6 +402,65 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- ===================================================================
+-- ELECTIVE SLOT VALIDATION TRIGGER
+-- ===================================================================
+
+CREATE OR REPLACE FUNCTION validate_timetable_event()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_existing_event RECORD;
+  v_new_is_elective BOOLEAN;
+  v_existing_is_elective BOOLEAN;
+BEGIN
+  -- Check for existing event at same slot
+  SELECT 
+    te.id,
+    te.elective_group_id,
+    s.is_elective
+  INTO v_existing_event
+  FROM timetable_events te
+  JOIN course_offerings co ON te.offering_id = co.id
+  JOIN subjects s ON co.subject_id = s.id
+  WHERE te.version_id = NEW.version_id
+    AND te.day_of_week = NEW.day_of_week
+    AND te.start_time = NEW.start_time
+    AND te.id != COALESCE(NEW.id, '00000000-0000-0000-0000-000000000000'::uuid)
+  LIMIT 1;
+  
+  IF v_existing_event IS NULL THEN
+    -- No conflict
+    RETURN NEW;
+  END IF;
+  
+  -- Get is_elective for the new event
+  SELECT s.is_elective INTO v_new_is_elective
+  FROM course_offerings co
+  JOIN subjects s ON co.subject_id = s.id
+  WHERE co.id = NEW.offering_id;
+  
+  v_existing_is_elective := v_existing_event.is_elective;
+  
+  -- Rule 1: Regular subject cannot stack with anything
+  IF NOT v_new_is_elective OR NOT v_existing_is_elective THEN
+    RAISE EXCEPTION 'Cannot place multiple events in the same slot unless both are electives from the same group';
+  END IF;
+  
+  -- Rule 2: Electives must be from the same group
+  IF v_existing_event.elective_group_id IS NULL OR NEW.elective_group_id IS NULL 
+     OR v_existing_event.elective_group_id != NEW.elective_group_id THEN
+    RAISE EXCEPTION 'Elective subjects must belong to the same elective group to share a time slot';
+  END IF;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS validate_timetable_event_trigger ON timetable_events;
+CREATE TRIGGER validate_timetable_event_trigger
+  BEFORE INSERT OR UPDATE ON timetable_events
+  FOR EACH ROW EXECUTE FUNCTION validate_timetable_event();
 
 -- ===================================================================
 -- RPC FUNCTIONS
@@ -411,6 +513,8 @@ ALTER TABLE timetable_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE period_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE academic_calendar ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timetable_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE elective_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_electives ENABLE ROW LEVEL SECURITY;
 
 -- Users policies
 CREATE POLICY "Users can view own data" ON users FOR SELECT TO authenticated USING (auth.uid() = id);
@@ -441,6 +545,8 @@ CREATE POLICY "Admins full access timetable_events" ON timetable_events FOR ALL 
 CREATE POLICY "Admins full access period_templates" ON period_templates FOR ALL TO authenticated USING ((SELECT u.is_admin FROM users u WHERE u.id = auth.uid()) = true);
 CREATE POLICY "Admins full access academic_calendar" ON academic_calendar FOR ALL TO authenticated USING ((SELECT u.is_admin FROM users u WHERE u.id = auth.uid()) = true);
 CREATE POLICY "Admins full access timetable (legacy)" ON timetable_entries FOR ALL TO authenticated USING ((SELECT u.is_admin FROM users u WHERE u.id = auth.uid()) = true);
+CREATE POLICY "Admins full access elective_groups" ON elective_groups FOR ALL TO authenticated USING ((SELECT u.is_admin FROM users u WHERE u.id = auth.uid()) = true);
+CREATE POLICY "Admins full access student_electives" ON student_electives FOR ALL TO authenticated USING ((SELECT u.is_admin FROM users u WHERE u.id = auth.uid()) = true);
 
 -- Student/mobile read access
 CREATE POLICY "Students read subjects" ON subjects FOR SELECT TO authenticated USING (true);
@@ -455,6 +561,9 @@ CREATE POLICY "Students read published timetable (V2)" ON timetable_events FOR S
   );
 CREATE POLICY "Students read published timetable (legacy)" ON timetable_entries FOR SELECT TO authenticated USING (is_published = true);
 CREATE POLICY "Students own backups" ON student_backups FOR ALL TO authenticated USING (student_id IN (SELECT id FROM students WHERE email = auth.email()));
+CREATE POLICY "Students read elective groups" ON elective_groups FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Students manage own electives" ON student_electives FOR ALL TO authenticated 
+  USING (student_id IN (SELECT id FROM students WHERE email = auth.email()));
 
 -- ===================================================================
 -- SEED DATA

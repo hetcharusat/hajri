@@ -212,7 +212,7 @@ export default function OfferingsNew({ embedded = false }) {
   // Type counts for filter badges
   const typeCounts = useMemo(() => ({
     ALL: subjects.length,
-    THEORY: subjects.filter(s => s.type === 'THEORY').length,
+    LECTURE: subjects.filter(s => s.type === 'LECTURE').length,
     LAB: subjects.filter(s => s.type === 'LAB').length,
     TUTORIAL: subjects.filter(s => s.type === 'TUTORIAL').length,
   }), [subjects])
@@ -399,7 +399,7 @@ export default function OfferingsNew({ embedded = false }) {
                   <span className="text-xs text-muted-foreground font-medium mr-2">Type:</span>
                   {[
                     { key: 'ALL', label: 'All', icon: BookOpen, color: 'bg-gray-500' },
-                    { key: 'THEORY', label: 'Theory', icon: BookMarked, color: 'bg-blue-500' },
+                    { key: 'LECTURE', label: 'Lecture', icon: BookMarked, color: 'bg-blue-500' },
                     { key: 'LAB', label: 'Lab', icon: Beaker, color: 'bg-purple-500' },
                     { key: 'TUTORIAL', label: 'Tutorial', icon: PenTool, color: 'bg-emerald-500' },
                   ].map(({ key, label, icon: Icon, color }) => (
