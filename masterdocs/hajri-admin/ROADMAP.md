@@ -1,44 +1,32 @@
 # Hajri Admin Portal - Development Roadmap
 
-**Last Updated:** December 22, 2025  
-**Status:** V2 Implementation Phase  
-**Next Session:** Fix build errors + deploy schema
+**Last Updated:** December 26, 2025  
+**Status:** V2 Implementation Phase - Core Features Stabilized  
+**Next Session:** Finalize deployment + User testing
 
 ---
 
 ## At a Glance
 
 **What to do next (order matters)**
-1. Fix `npm run dev` build/runtime error (blocks everything)
+1. Smoke test the V2 workflow end-to-end
 2. Deploy schema: run `hajri-admin/CLEAN-SCHEMA.sql` in Supabase
-3. Smoke test the V2 workflow end-to-end
+3. Finalize mobile responsiveness for Timetable
 
 **Definition of “done” for this milestone**
-- Can login as admin
-- Can create offerings
-- Can paint timetable in Draft
-- Can publish and view Published timetable
-
-**If you’re new**
-- Start at /getting-started/
-- Then read /hajri-admin/WORKFLOWS for the product flow
+- [x] Can login as admin
+- [x] Can create offerings with search/filter
+- [x] Can paint timetable in Draft (with Lab support)
+- [x] Can publish and view Published timetable
 
 ---
 
 ## 🚨 Immediate Blockers (P0)
 
 ### 1. Dev Server Build Errors
-**Status:** 🔴 Blocking  
-**Issue:** `npm run dev` exits with code 1  
-**Impact:** Cannot test or develop locally
-
-**Action Items:**
-- [ ] Run `npm run dev` and capture full error output
-- [ ] Fix any import/module issues
-- [ ] Verify all dependencies installed
-- [ ] Test dev server starts successfully
-
-**Estimated Time:** 30 minutes
+**Status:** ✅ Resolved  
+**Issue:** `npm run dev` was exiting with code 1  
+**Resolution:** Fixed imports and dependencies.
 
 ---
 
@@ -48,6 +36,31 @@
 **Impact:** Frontend expects V2 tables but DB still has V1 or incomplete schema
 
 **Action Items:**
+- [ ] Run `hajri-admin/CLEAN-SCHEMA.sql` in Supabase SQL Editor
+- [ ] Verify `classes` and `batches` have `name` columns
+- [ ] Verify `period_templates` has `slots` JSONB column
+
+---
+
+## ✨ Recent Improvements (Dec 26, 2025)
+
+### 1. Timetable V2 Overhaul
+- **Lab Support:** Automatic 2-hour slot merging for LAB type subjects.
+- **Conflict Detection:** Real-time validation to prevent overlapping schedules.
+- **Performance:** Replaced heavy Framer Motion animations with lightweight CSS transitions.
+- **UI:** High-contrast color coding for LEC/LAB/TUT and cleaner grid layout.
+
+### 2. Offerings Management
+- **Search & Filter:** Added robust filtering by subject type and assignment status.
+- **Stats:** Real-time counters for assigned vs pending offerings.
+
+### 3. Academic Calendar
+- **Data:** Integrated CHARUSAT 2025-26 academic calendar.
+- **Fixes:** Resolved UTC date shift issues in calendar display.
+
+### 4. UI/UX Refinement
+- **Overview:** Modernized stat cards and navigation tiles.
+- **Theme:** Added success/warning/info semantic colors to Tailwind config.
 - [ ] Open Supabase SQL Editor
 - [ ] Copy CLEAN-SCHEMA.sql contents
 - [ ] Run entire script (drops + creates all tables)

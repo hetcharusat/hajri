@@ -21,8 +21,9 @@ A React + Supabase admin panel for managing academic data and building timetable
 ### Planning
 - [Roadmap](/hajri-admin/ROADMAP) - Upcoming features and improvements
 
-- **Offerings model (V2):** schedulable unit = subject + batch + faculty (+ default room)
-- **Timetable versioning (V2):** per batch draft/published/archived
+- **Offerings model (V2):** schedulable unit = subject + batch + faculty (+ default room). Now includes advanced search and filtering.
+- **Timetable versioning (V2):** per batch draft/published/archived. Supports automatic Lab merging (2-hour slots) and conflict detection.
+- **Academic Calendar:** Integrated CHARUSAT 2025-26 calendar with local timezone support.
 
 ## Typical Admin Flow
 

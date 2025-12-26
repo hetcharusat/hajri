@@ -20,8 +20,7 @@
 **Core concepts (current)**
 - **Hierarchy scope** via Tree Explorer: department → branch → semester → class → batch.
 - **Course offering** = subject + batch + faculty (+ default room).
-- **Timetable versioning** per batch: draft + published + archived.
-
+- **Timetable versioning** per batch: draft + published + archived.- **Smart Scheduling:** Automatic 2-hour slot merging for LAB components and real-time conflict detection.
 **Key source files**
 - `hajri-admin/CLEAN-SCHEMA.sql`
 - `hajri-admin/src/App.tsx`

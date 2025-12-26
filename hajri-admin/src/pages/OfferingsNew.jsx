@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { ThemedSelect, formatOptionLabel } from '@/components/ui/react-select-themed'
 import { supabase } from '@/lib/supabase'
 import { useScopeStore, useStructureStore } from '@/lib/store'
-import { AlertCircle, BookOpen, Check, GraduationCap, MapPin, Plus, Trash2, User, X, Loader2, CheckCircle2, AlertTriangle, Info, RefreshCw } from 'lucide-react'
+import { AlertCircle, BookOpen, Check, GraduationCap, MapPin, Plus, Trash2, User, X, Loader2, CheckCircle2, AlertTriangle, Info, RefreshCw, Search, Filter, BookMarked, Beaker, PenTool } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Navigate } from 'react-router-dom'
 
@@ -15,6 +15,9 @@ export default function OfferingsNew({ embedded = false }) {
   const { batchId } = useScopeStore()
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const queryClient = useQueryClient()
 
   // Fetch batch and semester
@@ -206,6 +209,54 @@ export default function OfferingsNew({ embedded = false }) {
     return { assignedCount, totalCount, unassignedCount, completeCount }
   }, [offerings, subjects])
 
+  // Type counts for filter badges
+  const typeCounts = useMemo(() => ({
+    ALL: subjects.length,
+    THEORY: subjects.filter(s => s.type === 'THEORY').length,
+    LAB: subjects.filter(s => s.type === 'LAB').length,
+    TUTORIAL: subjects.filter(s => s.type === 'TUTORIAL').length,
+  }), [subjects])
+
+  // Status counts for filter badges
+  const statusCounts = useMemo(() => ({
+    ALL: subjects.length,
+    ASSIGNED: offerings.filter(o => o.faculty_id).length,
+    PENDING: offerings.length - offerings.filter(o => o.faculty_id).length,
+    UNASSIGNED: subjects.length - offerings.length,
+  }), [subjects, offerings])
+
+  // Filter subjects based on search and filters
+  const filteredSubjects = useMemo(() => {
+    let filtered = subjects
+
+    // Search filter
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      filtered = filtered.filter(s => {
+        const text = `${s.code} ${s.name} ${s.type}`.toLowerCase()
+        return text.includes(q)
+      })
+    }
+
+    // Type filter
+    if (typeFilter !== 'ALL') {
+      filtered = filtered.filter(s => s.type === typeFilter)
+    }
+
+    // Status filter
+    if (statusFilter !== 'ALL') {
+      filtered = filtered.filter(s => {
+        const offering = getOfferingForSubject(s.id)
+        if (statusFilter === 'ASSIGNED') return offering && offering.faculty_id
+        if (statusFilter === 'PENDING') return offering && !offering.faculty_id
+        if (statusFilter === 'UNASSIGNED') return !offering
+        return true
+      })
+    }
+
+    return filtered
+  }, [subjects, searchQuery, typeFilter, statusFilter, offerings])
+
   // Redirect if no valid selection (AFTER all hooks)
   if (!selectedNode || !batchId) {
     return embedded ? (
@@ -316,23 +367,146 @@ export default function OfferingsNew({ embedded = false }) {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {subjects.map((subject) => {
-            const offering = getOfferingForSubject(subject.id)
-            return (
-              <SubjectOfferingCard
-                key={subject.id}
-                subject={subject}
-                offering={offering}
-                faculty={faculty}
-                rooms={rooms}
-                onSave={handleSave}
-                onDelete={handleDelete}
-                isSaving={saveMutation.isPending}
-                isDeleting={deleteMutation.isPending}
-              />
-            )
-          })}
+        <div className="space-y-4">
+          {/* Search & Filter Bar */}
+          <Card className="border-border/50">
+            <CardContent className="p-4 space-y-4">
+              {/* Search Input */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search by code, name, or type..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+
+              {/* Filter Row */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Type Filters */}
+                <div className="flex items-center gap-1">
+                  <Filter className="h-4 w-4 text-muted-foreground mr-1" />
+                  <span className="text-xs text-muted-foreground font-medium mr-2">Type:</span>
+                  {[
+                    { key: 'ALL', label: 'All', icon: BookOpen, color: 'bg-gray-500' },
+                    { key: 'THEORY', label: 'Theory', icon: BookMarked, color: 'bg-blue-500' },
+                    { key: 'LAB', label: 'Lab', icon: Beaker, color: 'bg-purple-500' },
+                    { key: 'TUTORIAL', label: 'Tutorial', icon: PenTool, color: 'bg-emerald-500' },
+                  ].map(({ key, label, icon: Icon, color }) => (
+                    <button
+                      key={key}
+                      onClick={() => setTypeFilter(key)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                        typeFilter === key
+                          ? `${color} text-white shadow-sm`
+                          : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      <Icon className="h-3 w-3" />
+                      {label}
+                      <span className="text-[10px] opacity-80">({typeCounts[key]})</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="h-6 w-px bg-border" />
+
+                {/* Status Filters */}
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground font-medium mr-2">Status:</span>
+                  {[
+                    { key: 'ALL', label: 'All', color: 'bg-gray-500' },
+                    { key: 'ASSIGNED', label: 'Assigned', color: 'bg-green-500' },
+                    { key: 'PENDING', label: 'Pending', color: 'bg-amber-500' },
+                    { key: 'UNASSIGNED', label: 'Not Created', color: 'bg-red-500' },
+                  ].map(({ key, label, color }) => (
+                    <button
+                      key={key}
+                      onClick={() => setStatusFilter(key)}
+                      className={cn(
+                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
+                        statusFilter === key
+                          ? `${color} text-white shadow-sm`
+                          : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      {label}
+                      <span className="text-[10px] opacity-80">({statusCounts[key]})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Active filters summary */}
+              {(searchQuery || typeFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                  <span className="text-xs text-muted-foreground">
+                    Showing {filteredSubjects.length} of {subjects.length} subjects
+                  </span>
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setTypeFilter('ALL')
+                      setStatusFilter('ALL')
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Subject List */}
+          {filteredSubjects.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Search className="mx-auto h-8 w-8 text-muted-foreground/50 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">No subjects match your filters</p>
+                <button
+                  onClick={() => {
+                    setSearchQuery('')
+                    setTypeFilter('ALL')
+                    setStatusFilter('ALL')
+                  }}
+                  className="text-sm text-primary hover:underline mt-2"
+                >
+                  Clear filters
+                </button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {filteredSubjects.map((subject) => {
+                const offering = getOfferingForSubject(subject.id)
+                return (
+                  <SubjectOfferingCard
+                    key={subject.id}
+                    subject={subject}
+                    offering={offering}
+                    faculty={faculty}
+                    rooms={rooms}
+                    onSave={handleSave}
+                    onDelete={handleDelete}
+                    isSaving={saveMutation.isPending}
+                    isDeleting={deleteMutation.isPending}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </>

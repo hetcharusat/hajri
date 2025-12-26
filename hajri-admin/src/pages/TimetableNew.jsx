@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { 
@@ -13,7 +13,6 @@ import {
   rectIntersection,
   MeasuringStrategy
 } from '@dnd-kit/core'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -47,57 +46,48 @@ import { Label } from '@/components/ui/label'
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// Component type configuration
+// Component type configuration - using colors that work in dark theme
 const TYPE_CONFIG = {
   LECTURE: {
-    color: 'bg-blue-500',
-    lightBg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
-    text: 'text-blue-500',
-    darkText: 'text-blue-400',
+    bg: 'bg-blue-500/20',
+    border: 'border-blue-500/50',
+    accent: 'bg-blue-500',
+    text: 'text-blue-400',
+    badgeBg: 'bg-blue-500',
+    badgeText: 'text-white',
     icon: BookOpen,
-    label: 'Lecture'
+    label: 'LEC',
+    fullLabel: 'Lecture'
   },
   LAB: {
-    color: 'bg-purple-500',
-    lightBg: 'bg-purple-500/10',
-    border: 'border-purple-500/30',
-    text: 'text-purple-500',
-    darkText: 'text-purple-400',
+    bg: 'bg-purple-500/20',
+    border: 'border-purple-500/50',
+    accent: 'bg-purple-500',
+    text: 'text-purple-400',
+    badgeBg: 'bg-purple-500',
+    badgeText: 'text-white',
     icon: FlaskConical,
-    label: 'Lab'
+    label: 'LAB',
+    fullLabel: 'Laboratory'
   },
   TUTORIAL: {
-    color: 'bg-green-500',
-    lightBg: 'bg-green-500/10',
-    border: 'border-green-500/30',
-    text: 'text-green-500',
-    darkText: 'text-green-400',
+    bg: 'bg-emerald-500/20',
+    border: 'border-emerald-500/50',
+    accent: 'bg-emerald-500',
+    text: 'text-emerald-400',
+    badgeBg: 'bg-emerald-500',
+    badgeText: 'text-white',
     icon: GraduationCap,
-    label: 'Tutorial'
+    label: 'TUT',
+    fullLabel: 'Tutorial'
   }
 }
 
-// Animation variants
+// Simple animation variants - minimal
 const cardVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.95 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
-    scale: 1,
-    transition: { type: 'spring', stiffness: 300, damping: 24 }
-  },
-  exit: { 
-    opacity: 0, 
-    scale: 0.9, 
-    transition: { duration: 0.2 } 
-  },
-  hover: {
-    scale: 1.03,
-    boxShadow: '0 10px 40px rgba(0,0,0,0.12)',
-    transition: { type: 'spring', stiffness: 400, damping: 17 }
-  },
-  tap: { scale: 0.98 }
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } }
 }
 
 const dropZoneVariants = {
@@ -142,6 +132,43 @@ function cellKey(dayIdx, startTime) {
 function parseCellKey(key) {
   const [dayIdx, startTime] = key.split('|')
   return { dayIdx: Number.parseInt(dayIdx, 10), startTime: normalizeTimeString(startTime) }
+}
+
+// Check if a slot is occupied by any event (including spanning events like labs)
+function isSlotOccupied(dayIdx, slotStartTime, slotEndTime, events) {
+  const slotStart = normalizeTimeString(slotStartTime)
+  const slotEnd = normalizeTimeString(slotEndTime)
+  
+  return events.find(event => {
+    if (event.day_of_week !== dayIdx) return false
+    
+    const eventStart = normalizeTimeString(event.start_time)
+    const eventEnd = normalizeTimeString(event.end_time)
+    
+    // Check if event overlaps with this slot
+    // Event overlaps if: eventStart < slotEnd AND eventEnd > slotStart
+    return eventStart < slotEnd && eventEnd > slotStart
+  }) || null
+}
+
+// Calculate how many period rows an event should span
+function getEventRowSpan(event, slots) {
+  const eventStart = normalizeTimeString(event.start_time)
+  const eventEnd = normalizeTimeString(event.end_time)
+  
+  let spanCount = 0
+  for (const slot of slots) {
+    if (slot.is_break) continue
+    const slotStart = normalizeTimeString(slot.start_time)
+    const slotEnd = normalizeTimeString(slot.end_time)
+    
+    // Check if this slot is within the event's time range
+    if (slotStart >= eventStart && slotEnd <= eventEnd) {
+      spanCount++
+    }
+  }
+  
+  return Math.max(1, spanCount)
 }
 
 function formatTime(time) {
@@ -263,8 +290,8 @@ function RoomSelectSimple({ rooms, value, onChange, placeholder = "Select room..
   )
 }
 
-// Draggable offering card with type indicator
-function DraggableOffering({ offering, isDragging, index }) {
+// Enhanced draggable offering card with clear type indicators
+function DraggableOffering({ offering, isDragging, index, scheduledCount = 0 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging: dragging } = useDraggable({
     id: `offering-${offering.id}`,
     data: { type: 'offering', offering },
@@ -275,19 +302,13 @@ function DraggableOffering({ offering, isDragging, index }) {
   const TypeIcon = config.icon
 
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
-      variants={cardVariants}
-      initial="hidden"
-      animate={dragging ? "tap" : "visible"}
-      whileHover={!dragging ? "hover" : undefined}
-      whileTap="tap"
-      custom={index}
       className={cn(
-        'rounded-xl border-2 p-3 transition-colors cursor-grab active:cursor-grabbing select-none',
-        config.lightBg,
+        'relative rounded-lg border-2 p-2.5 cursor-grab active:cursor-grabbing select-none shadow-sm hover:shadow-md transition-all min-w-0',
+        config.bg,
         config.border,
-        dragging && 'opacity-50 scale-95 shadow-2xl z-50'
+        dragging && 'opacity-50 shadow-lg'
       )}
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -295,166 +316,183 @@ function DraggableOffering({ offering, isDragging, index }) {
       {...listeners}
       {...attributes}
     >
-      {/* Type Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <motion.div 
-            className={cn("p-1.5 rounded-lg", config.color)}
-            whileHover={{ scale: 1.1, rotate: 5 }}
-          >
-            <TypeIcon className="h-3.5 w-3.5 text-white" />
-          </motion.div>
-          <Badge className={cn("text-[10px] font-bold uppercase", config.color, "text-white border-0")}>
-            {componentType}
-          </Badge>
-        </div>
+      {/* Left accent bar */}
+      <div className={cn('absolute left-0 top-2 bottom-2 w-1 rounded-full', config.accent)} />
+      
+      {/* Header with type badge */}
+      <div className="flex items-center gap-1 pl-2 flex-wrap">
+        <span className={cn(
+          'inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0',
+          config.badgeBg, config.badgeText
+        )}>
+          <TypeIcon className="h-2.5 w-2.5" />
+          {config.label}
+        </span>
+        {componentType === 'LAB' && (
+          <span className="text-[9px] px-1 py-0.5 rounded-full bg-orange-500/30 text-orange-300 font-semibold shrink-0">
+            2h
+          </span>
+        )}
+        {scheduledCount > 0 && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/30 text-green-300 font-semibold shrink-0">
+            ×{scheduledCount}
+          </span>
+        )}
       </div>
       
-      {/* Subject Info */}
-      <div className="font-mono text-xs font-bold text-foreground">{offering.subjects?.code || '—'}</div>
-      <div className="text-sm font-medium text-foreground line-clamp-2 mt-0.5">{offering.subjects?.name || '—'}</div>
+      {/* Subject Code */}
+      <div className={cn('font-mono text-xs font-bold pl-2 mt-1.5 truncate', config.text)}>
+        {offering.subjects?.code}
+      </div>
+      
+      {/* Name */}
+      <div className="text-[11px] font-medium text-foreground/80 pl-2 mt-0.5 line-clamp-2 leading-tight">
+        {offering.subjects?.name || '—'}
+      </div>
       
       {/* Faculty */}
-      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
-        <User className="h-3 w-3 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground truncate">
-          {offering.faculty?.name || 'TBA'}
-        </span>
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground pl-2 mt-1.5 truncate">
+        <User className="h-2.5 w-2.5 shrink-0" />
+        <span className="truncate">{offering.faculty?.name || 'TBA'}</span>
       </div>
-    </motion.div>
+    </div>
   )
 }
 
-// Droppable cell with animation - ALWAYS droppable even when has event
-function DroppableCell({ cellId, isOver, hasEvent, children }) {
+// Minimal droppable cell
+function DroppableCell({ cellId, isOver, hasEvent, children, isLabSecondSlot }) {
   const { setNodeRef, isOver: dropping, active } = useDroppable({
     id: cellId,
     data: { type: 'cell', cellId },
-    // Don't disable - we handle conflicts in handleDragEnd
   })
 
   const isActive = isOver || dropping
-  const showDropIndicator = isActive && active // Only show when actively dragging
+  const showDrop = isActive && active && !hasEvent
 
   return (
     <div
       ref={setNodeRef}
       className={cn(
-        'min-h-[100px] w-full rounded-lg p-1 relative transition-all duration-200',
-        showDropIndicator && !hasEvent && 'ring-4 ring-primary/50 ring-inset bg-primary/10 shadow-xl scale-[1.02]',
-        showDropIndicator && hasEvent && 'ring-4 ring-destructive/50 ring-inset bg-destructive/10',
-        !hasEvent && !isActive && 'hover:bg-accent/5'
+        'relative h-full min-h-[60px] rounded-lg transition-colors',
+        !hasEvent && 'border border-dashed border-border/40 hover:border-primary/40 hover:bg-primary/5',
+        showDrop && 'border-primary border-solid bg-primary/10',
+        isLabSecondSlot && 'border-accent border-solid bg-accent/10',
+        hasEvent && 'border-0'
       )}
       style={{ touchAction: 'none' }}
     >
       {children}
-      {/* Drop indicator overlay */}
-      {showDropIndicator && !hasEvent && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-bold shadow-lg"
-          >
-            ✓ Drop here
-          </motion.div>
-        </div>
-      )}
-      {showDropIndicator && hasEvent && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-destructive text-destructive-foreground px-3 py-1.5 rounded-full text-xs font-bold shadow-lg"
-          >
-            ✗ Occupied
-          </motion.div>
+      {showDrop && !hasEvent && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <span className="text-xs font-medium text-primary">Drop here</span>
         </div>
       )}
     </div>
   )
 }
 
-// Timetable block with type indicator and animation
-function TimetableBlock({ event, onEdit, onDelete, viewMode }) {
+// Empty slot - minimal
+function EmptySlot({ isLabDragNextSlot }) {
+  if (isLabDragNextSlot) {
+    return (
+      <div className="h-full flex items-center justify-center text-accent">
+        <FlaskConical className="h-4 w-4 opacity-60" />
+      </div>
+    )
+  }
+  return null
+}
+
+// Enhanced timetable block with clear type indicators
+function TimetableBlock({ event, onEdit, onDelete, viewMode, rowSpan = 1 }) {
   const off = event.course_offerings
   const code = off?.subjects?.code
   const name = off?.subjects?.name
   const facultyName = off?.faculty?.name
   const roomNum = event.rooms?.room_number
   const componentType = off?.subjects?.type || 'LECTURE'
+  const isMultiSlot = rowSpan > 1
   
   const config = TYPE_CONFIG[componentType] || TYPE_CONFIG.LECTURE
   const TypeIcon = config.icon
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
-      whileHover={{ scale: 1.02 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-      className={cn(
-        'group relative rounded-xl border-2 p-2.5 shadow-md h-full min-h-[95px] flex flex-col',
-        config.lightBg,
-        config.border
-      )}
-    >
-      {/* Type indicator */}
-      <div className="flex items-center gap-1.5 mb-1">
-        <motion.div 
-          className={cn("p-1 rounded", config.color)}
-          whileHover={{ scale: 1.1 }}
-        >
-          <TypeIcon className="h-3 w-3 text-white" />
-        </motion.div>
-        <span className={cn("text-[10px] font-bold uppercase", config.darkText)}>{componentType}</span>
+    <div className={cn(
+      'group relative h-full rounded-lg border-2 p-2.5 flex flex-col overflow-hidden',
+      config.bg,
+      config.border
+    )}>
+      {/* Left accent bar */}
+      <div className={cn('absolute left-0 top-0 bottom-0 w-1.5', config.accent)} />
+      
+      {/* Type badge + Duration */}
+      <div className="flex items-center gap-1.5 pl-2.5 mb-1.5">
+        <span className={cn('inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded', config.badgeBg, config.badgeText)}>
+          <TypeIcon className="h-2.5 w-2.5" />
+          {config.label}
+        </span>
+        {isMultiSlot && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400 font-bold">
+            {rowSpan}hr
+          </span>
+        )}
       </div>
       
-      <div className={cn("font-mono text-xs font-bold", config.darkText)}>{code || '—'}</div>
-      <div className="text-xs font-semibold leading-tight mt-0.5 line-clamp-2 flex-1">{name || '—'}</div>
+      {/* Subject Code - prominent */}
+      <div className={cn('font-mono text-sm font-bold pl-2.5', config.text)}>
+        {code}
+      </div>
       
-      <div className="mt-auto pt-1 space-y-0.5">
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-          <User className="h-2.5 w-2.5" />
-          <span className="truncate">{facultyName || 'TBA'}</span>
+      {/* Name */}
+      <div className={cn(
+        'text-xs font-medium text-foreground/90 mt-0.5 pl-2.5 flex-1',
+        isMultiSlot ? 'line-clamp-3' : 'line-clamp-2'
+      )}>
+        {name || '—'}
+      </div>
+      
+      {/* Time for multi-slot */}
+      {isMultiSlot && (
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground pl-2.5 mt-1">
+          <Clock className="h-3 w-3" />
+          <span className="font-mono">{formatTime(event.start_time)} – {formatTime(event.end_time)}</span>
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-          <MapPin className="h-2.5 w-2.5" />
-          <span>{roomNum || 'No room'}</span>
-        </div>
+      )}
+      
+      {/* Footer with faculty + room */}
+      <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-1.5 pt-1.5 pl-2.5 border-t border-current/10">
+        <span className="flex items-center gap-1 truncate flex-1">
+          <User className="h-3 w-3 shrink-0" />
+          {facultyName || 'TBA'}
+        </span>
+        {roomNum && (
+          <span className="flex items-center gap-1 shrink-0">
+            <MapPin className="h-3 w-3" />
+            {roomNum}
+          </span>
+        )}
       </div>
 
+      {/* Edit/Delete on hover */}
       {viewMode === 'draft' && (
-        <motion.div 
-          className="absolute top-1 right-1 flex gap-0.5"
-          initial={{ opacity: 0 }}
-          whileHover={{ opacity: 1 }}
-        >
-          <motion.button
+        <div className="absolute top-1 right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
             type="button"
-            onClick={() => onEdit(event)}
-            className="rounded-full bg-background/90 p-1.5 hover:bg-secondary shadow-sm"
-            title="Edit"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            onClick={(e) => { e.stopPropagation(); onEdit(event) }}
+            className="w-6 h-6 rounded bg-secondary/80 flex items-center justify-center hover:bg-secondary"
           >
             <Edit2 className="h-3 w-3" />
-          </motion.button>
-          <motion.button
+          </button>
+          <button
             type="button"
-            onClick={() => onDelete(event.id)}
-            className="rounded-full bg-destructive text-white p-1.5 hover:bg-destructive/80 shadow-sm"
-            title="Delete"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            onClick={(e) => { e.stopPropagation(); onDelete(event.id) }}
+            className="w-6 h-6 rounded bg-destructive/80 text-white flex items-center justify-center hover:bg-destructive"
           >
             <Trash2 className="h-3 w-3" />
-          </motion.button>
-        </motion.div>
+          </button>
+        </div>
       )}
-    </motion.div>
+    </div>
   )
 }
 
@@ -467,31 +505,26 @@ function DragOverlayContent({ offering }) {
   const TypeIcon = config.icon
 
   return (
-    <motion.div
-      initial={{ scale: 0.8, opacity: 0, rotate: -5 }}
-      animate={{ scale: 1.05, opacity: 1, rotate: 3 }}
-      className={cn(
-        'rounded-xl border-2 p-3 shadow-2xl cursor-grabbing w-48',
-        config.lightBg,
-        config.border,
-        'ring-4 ring-primary/30'
-      )}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <div className={cn("p-1.5 rounded-lg", config.color)}>
-          <TypeIcon className="h-3.5 w-3.5 text-white" />
-        </div>
-        <Badge className={cn("text-[10px] font-bold uppercase", config.color, "text-white border-0")}>
-          {componentType}
-        </Badge>
+    <div className={cn(
+      'rounded-lg border-2 p-3 shadow-2xl cursor-grabbing w-48',
+      config.bg,
+      config.border,
+      'ring-2 ring-primary/50'
+    )}>
+      <div className={cn('absolute left-0 top-3 bottom-3 w-1.5 rounded-full', config.accent)} />
+      <div className="flex items-center gap-2 pl-3">
+        <span className={cn('inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full', config.badgeBg, config.badgeText)}>
+          <TypeIcon className="h-3 w-3" />
+          {config.label}
+        </span>
       </div>
-      <div className="font-mono text-xs font-bold text-foreground">{offering.subjects?.code || '—'}</div>
-      <div className="text-sm font-medium text-foreground line-clamp-2 mt-0.5">{offering.subjects?.name || '—'}</div>
-      <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-border/50">
-        <User className="h-3 w-3 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground truncate">{offering.faculty?.name || 'TBA'}</span>
+      <div className={cn('font-mono text-sm font-bold pl-3 mt-2', config.text)}>
+        {offering.subjects?.code}
       </div>
-    </motion.div>
+      <div className="text-sm font-medium text-foreground pl-3 mt-0.5 line-clamp-2">
+        {offering.subjects?.name || '—'}
+      </div>
+    </div>
   )
 }
 
@@ -685,6 +718,23 @@ export default function TimetableNew() {
   const offerings = offeringsQuery.data || []
   const events = eventsQuery.data || []
 
+  // Get set of assigned offering IDs and their counts
+  const assignedOfferingIds = useMemo(() => {
+    return new Set(events.map(e => e.offering_id))
+  }, [events])
+
+  // Count how many times each offering is scheduled
+  const scheduledCountMap = useMemo(() => {
+    const map = new Map()
+    events.forEach(e => {
+      map.set(e.offering_id, (map.get(e.offering_id) || 0) + 1)
+    })
+    return map
+  }, [events])
+
+  // State for assignment filter
+  const [assignmentFilter, setAssignmentFilter] = useState('ALL') // 'ALL', 'UNASSIGNED', 'ASSIGNED'
+
   // Filter offerings
   const filteredOfferings = useMemo(() => {
     let filtered = offerings
@@ -692,6 +742,13 @@ export default function TimetableNew() {
     // Filter by type
     if (typeFilter !== 'ALL') {
       filtered = filtered.filter(o => (o.subjects?.type || 'LECTURE') === typeFilter)
+    }
+    
+    // Filter by assignment status
+    if (assignmentFilter === 'UNASSIGNED') {
+      filtered = filtered.filter(o => !assignedOfferingIds.has(o.id))
+    } else if (assignmentFilter === 'ASSIGNED') {
+      filtered = filtered.filter(o => assignedOfferingIds.has(o.id))
     }
     
     // Filter by search
@@ -704,7 +761,7 @@ export default function TimetableNew() {
     }
     
     return filtered
-  }, [offerings, typeFilter, searchQuery])
+  }, [offerings, typeFilter, searchQuery, assignmentFilter, assignedOfferingIds])
 
   // Type counts
   const typeCounts = useMemo(() => ({
@@ -713,6 +770,13 @@ export default function TimetableNew() {
     LAB: offerings.filter(o => o.subjects?.type === 'LAB').length,
     TUTORIAL: offerings.filter(o => o.subjects?.type === 'TUTORIAL').length,
   }), [offerings])
+
+  // Assignment counts
+  const assignmentCounts = useMemo(() => ({
+    ALL: offerings.length,
+    UNASSIGNED: offerings.filter(o => !assignedOfferingIds.has(o.id)).length,
+    ASSIGNED: offerings.filter(o => assignedOfferingIds.has(o.id)).length,
+  }), [offerings, assignedOfferingIds])
 
   const templateReady = Boolean(activeTemplateQuery.data) && periods.length > 0
   const blockEditingReason = !activeTemplateQuery.data
@@ -862,13 +926,49 @@ export default function TimetableNew() {
       return
     }
 
-    const conflictingEvent = events.find(
-      (e) => e.day_of_week === dayIdx && normalizeTimeString(e.start_time) === normalizeTimeString(period.start_time)
-    )
-
-    if (conflictingEvent) {
-      setError(`Slot already occupied by ${conflictingEvent.course_offerings?.subjects?.code || 'another offering'}`)
+    // Check if this slot is occupied (including by spanning events)
+    const slotOccupied = isSlotOccupied(dayIdx, period.start_time, period.end_time, events)
+    if (slotOccupied) {
+      setError(`Slot already occupied by ${slotOccupied.course_offerings?.subjects?.code || 'another offering'}`)
       return
+    }
+
+    // Determine subject type and calculate end time
+    const subjectType = offeringData.subjects?.type || 'LECTURE'
+    let endTime = period.end_time
+    let periodName = period.name
+    let isLabMerge = false
+
+    // LAB handling - needs 2 consecutive slots
+    if (subjectType === 'LAB') {
+      const currentPeriodIndex = periods.findIndex(p => 
+        normalizeTimeString(p.start_time) === normalizeTimeString(period.start_time)
+      )
+      const nextPeriod = periods[currentPeriodIndex + 1]
+
+      // Validate next slot exists
+      if (!nextPeriod) {
+        setError('Lab requires 2 consecutive periods. No period after this slot.')
+        return
+      }
+
+      // Validate next slot is not a break
+      if (nextPeriod.is_break) {
+        setError('Lab requires 2 consecutive periods. Next slot is a break.')
+        return
+      }
+
+      // Check if next slot is occupied (including by spanning events)
+      const nextSlotOccupied = isSlotOccupied(dayIdx, nextPeriod.start_time, nextPeriod.end_time, events)
+      if (nextSlotOccupied) {
+        setError(`Lab requires 2 consecutive periods. Next slot is occupied by ${nextSlotOccupied.course_offerings?.subjects?.code || 'another offering'}.`)
+        return
+      }
+
+      // Use next period's end time for 2-hour duration
+      endTime = nextPeriod.end_time
+      periodName = `${period.name} + ${nextPeriod.name}`
+      isLabMerge = true
     }
 
     // Reset selected room and open dialog
@@ -877,12 +977,13 @@ export default function TimetableNew() {
       offeringId: offeringData.id,
       offeringName: offeringData.subjects?.name,
       offeringCode: offeringData.subjects?.code,
-      offeringType: offeringData.subjects?.type || 'LECTURE',
+      offeringType: subjectType,
       dayIdx,
       dayName: DAYS[dayIdx],
-      periodName: period.name,
+      periodName,
       startTime: period.start_time,
-      endTime: period.end_time,
+      endTime,
+      isLabMerge,
     })
   }
 
@@ -931,18 +1032,10 @@ export default function TimetableNew() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <motion.div 
-          className="text-center space-y-3"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <motion.div 
-            className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent mx-auto"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-          />
+        <div className="text-center space-y-3">
+          <div className="h-8 w-8 rounded-full border-4 border-primary border-t-transparent mx-auto animate-spin" />
           <p className="text-sm text-muted-foreground">Loading timetable...</p>
-        </motion.div>
+        </div>
       </div>
     )
   }
@@ -951,14 +1044,47 @@ export default function TimetableNew() {
     return <Navigate to="/app/overview" replace />
   }
 
+  // Build eventsByCell - maps each cell to the event that occupies it
+  // For multi-slot events (labs), mark all spanned cells
   const eventsByCell = {}
+  const eventSpanInfo = {} // Track which events span multiple rows
+  
   for (const ev of events) {
     if (!ev.start_time) continue
-    const key = cellKey(ev.day_of_week, ev.start_time)
-    eventsByCell[key] = ev
+    
+    const eventStart = normalizeTimeString(ev.start_time)
+    const eventEnd = normalizeTimeString(ev.end_time)
+    const rowSpan = getEventRowSpan(ev, periods)
+    
+    // Store span info for the primary cell (first slot)
+    const primaryKey = cellKey(ev.day_of_week, ev.start_time)
+    eventsByCell[primaryKey] = ev
+    eventSpanInfo[primaryKey] = { rowSpan, isPrimary: true }
+    
+    // Mark spanned cells (for multi-slot events like labs)
+    if (rowSpan > 1) {
+      let spanCount = 0
+      for (const slot of periods) {
+        if (slot.is_break) continue
+        const slotStart = normalizeTimeString(slot.start_time)
+        const slotEnd = normalizeTimeString(slot.end_time)
+        
+        // Check if this slot is within the event's time range
+        if (slotStart >= eventStart && slotEnd <= eventEnd) {
+          spanCount++
+          if (spanCount > 1) {
+            // This is a spanned cell (not the primary)
+            const spannedKey = cellKey(ev.day_of_week, slot.start_time)
+            eventsByCell[spannedKey] = ev
+            eventSpanInfo[spannedKey] = { rowSpan: 0, isPrimary: false, primaryKey }
+          }
+        }
+      }
+    }
   }
 
   const activeOffering = activeId ? offerings.find((o) => `offering-${o.id}` === activeId) : null
+  const activeOfferingType = activeOffering?.subjects?.type || 'LECTURE'
 
   return (
     <>
@@ -975,50 +1101,30 @@ export default function TimetableNew() {
           },
         }}
       >
-        <motion.div 
-          className="space-y-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          {/* Header */}
-          <motion.div 
-            className="flex items-center justify-between"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="flex items-center gap-4">
-              <motion.div 
-                className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
-                whileHover={{ scale: 1.05, rotate: 5 }}
-              >
-                <Calendar className="h-6 w-6 text-white" />
-              </motion.div>
+        <div className="space-y-4">
+          {/* Header - Minimal */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-primary-foreground" />
+              </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">
-                  Class Timetable
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {offerings.length} offerings • Drag to schedule
-                </p>
+                <h1 className="text-xl font-bold">Timetable</h1>
+                <p className="text-xs text-muted-foreground">{offerings.length} offerings available</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={handleRefresh}
                 disabled={busy || refreshing}
-                className="gap-2"
               >
                 <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-                Refresh
               </Button>
-              <div className="h-6 w-px bg-border" />
               <Button
-                variant={viewMode === 'draft' ? 'default' : 'outline'}
+                variant={viewMode === 'draft' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('draft')}
                 disabled={busy}
@@ -1026,265 +1132,324 @@ export default function TimetableNew() {
                 Draft
               </Button>
               <Button
-                variant={viewMode === 'published' ? 'default' : 'outline'}
+                variant={viewMode === 'published' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('published')}
                 disabled={busy || !publishedVersionId}
               >
-                <Eye className="mr-2 h-4 w-4" />
                 Published
               </Button>
               <Button 
                 size="sm"
                 onClick={publishDraft} 
                 disabled={busy || viewMode !== 'draft' || !templateReady}
-                className="shadow-md"
               >
                 <Save className="mr-2 h-4 w-4" />
                 Publish
               </Button>
             </div>
-          </motion.div>
+          </div>
 
           {/* Error */}
-          <AnimatePresence>
-            {error && (
-              <motion.div 
-                className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-destructive">Error</p>
-                  <p className="text-sm text-muted-foreground">{error}</p>
-                </div>
-                <button onClick={() => setError('')}><X className="h-4 w-4" /></button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <span className="text-destructive flex-1">{error}</span>
+              <button onClick={() => setError('')} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           {/* Template Warning */}
-          <AnimatePresence>
-            {blockEditingReason && (
-              <motion.div 
-                className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold">Period template required</p>
-                  <p className="text-sm text-muted-foreground">{blockEditingReason}</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {blockEditingReason && (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 p-3 text-sm">
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">{blockEditingReason}</span>
+            </div>
+          )}
 
-          {/* Offerings Panel with Type Filters */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="border-2">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <CardTitle className="text-lg">Available Offerings</CardTitle>
+          {/* Offerings Panel - Enhanced Design */}
+          <div className="rounded-lg border border-border bg-card">
+            {/* Header */}
+            <div className="p-3 border-b border-border flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" />
+                <span className="font-medium text-sm">Offerings</span>
+                <span className="text-xs text-muted-foreground">({offerings.length})</span>
+              </div>
+              
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Assignment Status Filter */}
+                <div className="flex items-center gap-1 text-xs bg-muted/50 rounded-lg p-1">
+                  {[
+                    { key: 'ALL', label: 'All', count: assignmentCounts.ALL },
+                    { key: 'UNASSIGNED', label: 'Pending', count: assignmentCounts.UNASSIGNED },
+                    { key: 'ASSIGNED', label: 'Scheduled', count: assignmentCounts.ASSIGNED },
+                  ].map(({ key, label, count }) => (
+                    <button
+                      key={key}
+                      onClick={() => setAssignmentFilter(key)}
+                      className={cn(
+                        "px-2 py-1 rounded transition-colors flex items-center gap-1.5",
+                        assignmentFilter === key 
+                          ? key === 'UNASSIGNED' ? 'bg-orange-500 text-white' : key === 'ASSIGNED' ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:bg-muted'
+                      )}
+                    >
+                      {label}
+                      <span className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded-full",
+                        assignmentFilter === key ? 'bg-white/20' : 'bg-muted'
+                      )}>
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Type Filter */}
+                <div className="flex items-center gap-1 text-xs bg-muted/50 rounded-lg p-1">
+                  {['ALL', 'LECTURE', 'LAB', 'TUTORIAL'].filter(t => t === 'ALL' || typeCounts[t] > 0).map(key => (
+                    <button
+                      key={key}
+                      onClick={() => setTypeFilter(key)}
+                      className={cn(
+                        "px-2 py-1 rounded transition-colors",
+                        typeFilter === key 
+                          ? key === 'LECTURE' ? 'bg-blue-600 text-white' : key === 'LAB' ? 'bg-purple-600 text-white' : key === 'TUTORIAL' ? 'bg-emerald-600 text-white' : 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:bg-muted'
+                      )}
+                    >
+                      {key === 'ALL' ? 'All Types' : key.charAt(0) + key.slice(1).toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    className="w-40 h-8 text-xs pl-7 bg-background"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search code, name..."
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Refresh Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    queryClient.invalidateQueries({ queryKey: ['courseOfferings'] })
+                    queryClient.invalidateQueries({ queryKey: ['timetableEvents'] })
+                  }}
+                  className="h-8 px-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Content */}
+            <div className="p-3">
+              {offerings.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No offerings available
+                </div>
+              ) : filteredOfferings.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No matches found
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 max-h-[200px] overflow-y-auto overflow-x-hidden">
+                  {filteredOfferings.map((o, idx) => (
+                    <DraggableOffering 
+                      key={o.id} 
+                      offering={o} 
+                      isDragging={activeId === `offering-${o.id}`}
+                      index={idx}
+                      scheduledCount={scheduledCountMap.get(o.id) || 0}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Timetable Grid - Minimal Clean Design */}
+          <div className="mt-4">
+            {!templateReady ? (
+              <div className="rounded-lg border border-dashed border-border p-12 text-center">
+                <Clock className="h-8 w-8 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="font-medium text-muted-foreground">Period Template Required</p>
+                <p className="text-sm text-muted-foreground/60 mt-1">{blockEditingReason}</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border overflow-hidden bg-card">
+                {/* CSS Grid: 7 columns (time + 6 days), rows based on periods */}
+                <div 
+                  className="grid"
+                  style={{ 
+                    gridTemplateColumns: '100px repeat(6, 1fr)',
+                    gridTemplateRows: `auto repeat(${periods.length}, minmax(56px, auto))`
+                  }}
+                >
+                  {/* Header Row */}
+                  <div className="bg-muted/50 border-b border-r border-border p-2 flex items-center justify-center">
+                    <span className="text-xs font-medium text-muted-foreground uppercase">Time</span>
                   </div>
+                  {DAYS.map((day, idx) => (
+                    <div 
+                      key={day} 
+                      className={cn(
+                        "bg-muted/50 border-b border-border p-2 text-center",
+                        idx < 5 && "border-r"
+                      )}
+                    >
+                      <div className="text-xs font-bold text-foreground">{day}</div>
+                    </div>
+                  ))}
                   
-                  <div className="flex items-center gap-3">
-                    {/* Type Filter Tabs */}
-                    <div className="flex items-center bg-muted rounded-lg p-1 gap-1">
-                      {[
-                        { key: 'ALL', label: 'All', icon: Layers, color: '' },
-                        { key: 'LECTURE', label: 'Lectures', icon: BookOpen, color: 'bg-blue-500' },
-                        { key: 'LAB', label: 'Labs', icon: FlaskConical, color: 'bg-purple-500' },
-                        { key: 'TUTORIAL', label: 'Tutorials', icon: GraduationCap, color: 'bg-green-500' },
-                      ].filter(t => t.key === 'ALL' || t.key === 'LECTURE' || t.key === 'LAB' || (t.key === 'TUTORIAL' && typeCounts.TUTORIAL > 0))
-                        .map(({ key, label, icon: Icon, color }) => (
-                        <motion.button
-                          key={key}
-                          onClick={() => setTypeFilter(key)}
-                          className={cn(
-                            "px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5",
-                            typeFilter === key 
-                              ? key === 'ALL' 
-                                ? 'bg-background shadow-sm text-foreground' 
-                                : `${color} text-white shadow-sm`
-                              : 'text-muted-foreground hover:text-foreground'
-                          )}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                          {label} ({typeCounts[key]})
-                        </motion.button>
-                      ))}
-                    </div>
+                  {/* Period Rows */}
+                  {periods.map((period, periodIdx) => {
+                    const isLast = periodIdx === periods.length - 1
                     
-                    {/* Search */}
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        className="w-56 h-8 text-sm pl-9"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search offerings..."
-                        disabled={viewMode === 'published'}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <CardDescription>Drag any offering to schedule it in the timetable below</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {offerings.length === 0 ? (
-                  <div className="text-sm text-muted-foreground py-8 text-center">
-                    No offerings for this batch. Create them in Assignments first.
-                  </div>
-                ) : filteredOfferings.length === 0 ? (
-                  <div className="text-sm text-muted-foreground py-8 text-center">
-                    No offerings match your filter.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[280px] overflow-y-auto p-1">
-                    <AnimatePresence mode="popLayout">
-                      {filteredOfferings.map((o, idx) => (
-                        <DraggableOffering 
-                          key={o.id} 
-                          offering={o} 
-                          isDragging={activeId === `offering-${o.id}`}
-                          index={idx}
-                        />
-                      ))}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Timetable Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="border-2">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-muted-foreground" />
-                      Weekly Timetable Grid
-                    </CardTitle>
-                    <CardDescription>
-                      {viewMode === 'published' ? 'Published (read-only)' : 'Draft - Drag offerings into slots'}
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {!templateReady ? (
-                  <div className="rounded-lg border-2 border-dashed border-border bg-muted/20 p-12 text-center">
-                    <Clock className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                    <p className="font-medium">Period template required</p>
-                    <p className="text-sm text-muted-foreground mt-1">{blockEditingReason}</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto border-2 border-border rounded-xl">
-                    <table className="w-full border-collapse min-w-[1200px]">
-                      <thead>
-                        <tr>
-                          <th className="border-r-2 border-b-2 border-border bg-muted/50 px-4 py-3 text-left text-sm font-semibold w-36 sticky left-0 z-10">
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-muted-foreground" />
-                              Period
-                            </div>
-                          </th>
-                          {DAYS.map((day, idx) => (
-                            <th key={day} className="border-r-2 border-b-2 border-border bg-muted/50 px-3 py-3 text-center min-w-[170px]">
-                              <div className="text-xs text-muted-foreground">{DAY_ABBR[idx]}</div>
-                              <div className="text-sm font-semibold">{day}</div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {periods.map((period) => (
-                          <tr key={period.id}>
-                            <td className="border-r-2 border-b-2 border-border bg-muted/30 px-4 py-3 align-top sticky left-0 z-10">
-                              <div className="text-sm font-bold">{period.name}</div>
-                              <div className="text-xs text-muted-foreground font-mono mt-0.5">
-                                {formatTime(period.start_time)} - {formatTime(period.end_time)}
+                    return (
+                      <React.Fragment key={period.id}>
+                        {/* Time Label Cell */}
+                        <div className={cn(
+                          "border-r border-border p-2 flex flex-col justify-center",
+                          !isLast && "border-b",
+                          period.is_break && "bg-warning/5"
+                        )}>
+                          <div className={cn(
+                            "text-xs font-semibold",
+                            period.is_break ? "text-warning" : "text-foreground"
+                          )}>
+                            {period.name}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-mono">
+                            {formatTime(period.start_time)}
+                          </div>
+                          {period.is_break && (
+                            <span className="text-[10px] text-warning mt-0.5">Break</span>
+                          )}
+                        </div>
+                        
+                        {/* Day Cells for this Period */}
+                        {DAYS.map((_, dayIdx) => {
+                          const key = cellKey(dayIdx, period.start_time)
+                          const ev = eventsByCell[key]
+                          const spanInfo = eventSpanInfo[key]
+                          const isOver = overId === key
+                          const isLastDay = dayIdx === 5
+                          
+                          // Check if lab drag should highlight next slot
+                          const isLabDragNextSlot = activeOfferingType === 'LAB' && (() => {
+                            if (!overId) return false
+                            const { dayIdx: overDayIdx, startTime: overStartTime } = parseCellKey(overId)
+                            if (overDayIdx !== dayIdx) return false
+                            const overPeriodIndex = periods.findIndex(p => 
+                              normalizeTimeString(p.start_time) === overStartTime
+                            )
+                            const currentPeriodIndex = periods.findIndex(p => 
+                              normalizeTimeString(p.start_time) === normalizeTimeString(period.start_time)
+                            )
+                            return currentPeriodIndex === overPeriodIndex + 1
+                          })()
+                          
+                          // If this cell is covered by a spanning event (not primary), skip rendering
+                          if (spanInfo && !spanInfo.isPrimary) {
+                            return null // Cell is merged - don't render
+                          }
+                          
+                          const rowSpan = spanInfo?.rowSpan || 1
+                          
+                          // Break cell
+                          if (period.is_break) {
+                            return (
+                              <div
+                                key={dayIdx}
+                                className={cn(
+                                  "bg-warning/5 flex items-center justify-center",
+                                  !isLast && "border-b border-border",
+                                  !isLastDay && "border-r border-border"
+                                )}
+                              >
+                                <span className="text-warning/40 text-sm">—</span>
                               </div>
-                              {period.is_break && (
-                                <Badge variant="secondary" className="mt-1 bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px]">
-                                  Break
-                                </Badge>
+                            )
+                          }
+
+                          // Regular cell - use gridRow for spanning
+                          return (
+                            <div
+                              key={dayIdx}
+                              className={cn(
+                                "p-1",
+                                !isLast && rowSpan === 1 && "border-b border-border",
+                                !isLastDay && "border-r border-border"
                               )}
-                            </td>
-                            {DAYS.map((_, dayIdx) => {
-                              const key = cellKey(dayIdx, period.start_time)
-                              const ev = eventsByCell[key]
-                              const isOver = overId === key
+                              style={{
+                                gridRow: rowSpan > 1 ? `span ${rowSpan}` : undefined
+                              }}
+                            >
+                              <DroppableCell 
+                                cellId={key} 
+                                isOver={isOver || isLabDragNextSlot} 
+                                hasEvent={Boolean(ev)}
+                                isLabSecondSlot={isLabDragNextSlot}
+                              >
+                                {ev ? (
+                                  <TimetableBlock
+                                    event={ev}
+                                    viewMode={viewMode}
+                                    onEdit={(e) => setEditDialog({ event: e })}
+                                    onDelete={handleDelete}
+                                    rowSpan={rowSpan}
+                                  />
+                                ) : (
+                                  <EmptySlot isLabDragNextSlot={isLabDragNextSlot} />
+                                )}
+                              </DroppableCell>
+                            </div>
+                          )
+                        })}
+                      </React.Fragment>
+                    )
+                  })}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-6 p-3 border-t border-border bg-muted/30">
+                  {Object.entries(TYPE_CONFIG).map(([type, config]) => {
+                    const Icon = config.icon
+                    return (
+                      <div key={type} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className={cn("w-2.5 h-2.5 rounded-sm", config.accent)} />
+                        <Icon className="h-3 w-3" />
+                        <span>{type}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
-                              return (
-                                <td key={dayIdx} className="border-r-2 border-b-2 border-border p-1.5 align-top min-w-[170px] bg-background">
-                                  {period.is_break ? (
-                                    <div className="h-[100px] flex items-center justify-center rounded-xl bg-amber-500/10 border-2 border-amber-500/30 text-sm font-bold text-amber-600">
-                                      ☕ Break
-                                    </div>
-                                  ) : (
-                                    <DroppableCell cellId={key} isOver={isOver} hasEvent={Boolean(ev)}>
-                                      <AnimatePresence mode="wait">
-                                        {ev ? (
-                                          <div className="pointer-events-auto">
-                                            <TimetableBlock
-                                              key={ev.id}
-                                              event={ev}
-                                              viewMode={viewMode}
-                                              onEdit={(e) => setEditDialog({ event: e })}
-                                              onDelete={handleDelete}
-                                            />
-                                          </div>
-                                        ) : (
-                                          <motion.div 
-                                            key="empty"
-                                            className="h-[100px] flex items-center justify-center text-xs border-2 border-dashed rounded-xl border-border/50 text-muted-foreground/50"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                          >
-                                            {viewMode === 'draft' ? 'Drop here' : '—'}
-                                          </motion.div>
-                                        )}
-                                      </AnimatePresence>
-                                    </DroppableCell>
-                                  )}
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-        </motion.div>
-
-        {/* Drag Overlay - follows cursor smoothly */}
-        <DragOverlay dropAnimation={{
-          duration: 250,
-          easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-        }}>
+        {/* Drag Overlay */}
+        <DragOverlay dropAnimation={null}>
           <DragOverlayContent offering={activeOffering} />
         </DragOverlay>
       </DndContext>
@@ -1305,16 +1470,28 @@ export default function TimetableNew() {
             <DialogDescription asChild>
               <div className="space-y-2">
                 {roomPickDialog && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge className={cn(
-                      "text-xs",
-                      TYPE_CONFIG[roomPickDialog.offeringType]?.color,
-                      "text-white border-0"
-                    )}>
-                      {roomPickDialog.offeringType}
-                    </Badge>
-                    <span className="font-mono font-bold">{roomPickDialog.offeringCode}</span>
-                  </div>
+                  <>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Badge className={cn(
+                        "text-xs",
+                        TYPE_CONFIG[roomPickDialog.offeringType]?.color,
+                        "text-white border-0"
+                      )}>
+                        {roomPickDialog.offeringType}
+                      </Badge>
+                      <span className="font-mono font-bold">{roomPickDialog.offeringCode}</span>
+                      {roomPickDialog.isLabMerge && (
+                        <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-600 border-purple-500/30">
+                          2 Hours
+                        </Badge>
+                      )}
+                    </div>
+                    {roomPickDialog.isLabMerge && (
+                      <div className="text-xs bg-purple-500/10 text-purple-600 px-2 py-1.5 rounded-md border border-purple-500/20">
+                        ⚗️ Lab will occupy 2 consecutive periods
+                      </div>
+                    )}
+                  </>
                 )}
                 <div className="text-sm">
                   Scheduling for <strong>{roomPickDialog?.dayName}</strong>, <strong>{roomPickDialog?.periodName}</strong>

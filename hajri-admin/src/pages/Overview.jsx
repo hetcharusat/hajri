@@ -9,31 +9,34 @@ import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 import { useScopeStore, useStructureStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
-import { Plus, Edit2, Trash2, RefreshCw, Sparkles, TrendingUp, Users, BookOpen, Layers } from 'lucide-react'
+import { Plus, Edit2, Trash2, RefreshCw, TrendingUp, Users, BookOpen, Layers } from 'lucide-react'
 
 function StatCard({ label, value, helper, icon: Icon, color = 'primary' }) {
-  const colorClasses = {
-    primary: 'from-primary/10 to-primary/5 border-primary/20',
-    blue: 'from-blue-500/10 to-blue-500/5 border-blue-500/20',
-    green: 'from-green-500/10 to-green-500/5 border-green-500/20',
-    purple: 'from-purple-500/10 to-purple-500/5 border-purple-500/20',
-    amber: 'from-amber-500/10 to-amber-500/5 border-amber-500/20',
+  const colorConfig = {
+    primary: { bg: 'bg-primary/20', border: 'border-primary/50', icon: 'bg-primary text-white', value: 'text-primary' },
+    blue: { bg: 'bg-blue-500/20', border: 'border-blue-500/50', icon: 'bg-blue-500 text-white', value: 'text-blue-400' },
+    green: { bg: 'bg-emerald-500/20', border: 'border-emerald-500/50', icon: 'bg-emerald-500 text-white', value: 'text-emerald-400' },
+    purple: { bg: 'bg-purple-500/20', border: 'border-purple-500/50', icon: 'bg-purple-500 text-white', value: 'text-purple-400' },
+    amber: { bg: 'bg-amber-500/20', border: 'border-amber-500/50', icon: 'bg-amber-500 text-white', value: 'text-amber-400' },
   }
+  
+  const cfg = colorConfig[color] || colorConfig.primary
   
   return (
     <Card className={cn(
-      "p-6 border-2 hover:shadow-lg transition-all duration-300 bg-gradient-to-br",
-      colorClasses[color] || colorClasses.primary
+      "p-6 border-2 hover:shadow-lg transition-all duration-300",
+      cfg.bg,
+      cfg.border
     )}>
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-sm font-semibold text-muted-foreground mb-2">{label}</div>
-          <div className="text-3xl font-bold text-foreground">{value}</div>
-          {helper && <div className="mt-2 text-xs text-muted-foreground">{helper}</div>}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="text-xs font-bold uppercase tracking-wider text-foreground/60 mb-1">{label}</div>
+          <div className={cn("text-4xl font-bold", cfg.value)}>{value}</div>
+          {helper && <div className="mt-2 text-sm text-foreground/50">{helper}</div>}
         </div>
         {Icon && (
-          <div className="h-10 w-10 rounded-xl bg-background/80 flex items-center justify-center shadow-sm">
-            <Icon className="h-5 w-5 text-muted-foreground" />
+          <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center shadow-md", cfg.icon)}>
+            <Icon className="h-6 w-6" />
           </div>
         )}
       </div>
@@ -396,18 +399,22 @@ export default function Overview() {
 
   return (
     <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between bg-gradient-to-r from-primary/5 via-transparent to-transparent p-4 rounded-xl border border-border/50">
+      <div className="flex items-center justify-between bg-card p-5 rounded-xl border-2 border-border shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg">
-            <TrendingUp className="h-6 w-6 text-white" />
+          <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+            <TrendingUp className="h-7 w-7 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded">
+                {selectedNode?.type || 'Overview'}
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mt-1">
               {selectedNode?.name || 'Overview'}
-              <Sparkles className="h-5 w-5 text-primary/60" />
             </h1>
-            <p className="text-sm text-muted-foreground">
-              {selectedNode?.type?.charAt(0).toUpperCase() + selectedNode?.type?.slice(1)} • Summary for the current tree scope
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Summary and navigation for this scope
             </p>
           </div>
         </div>
@@ -524,22 +531,28 @@ export default function Overview() {
           ) : (childrenQuery.data || []).length === 0 ? (
             <div className="text-sm text-muted-foreground">No items yet.</div>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(childrenQuery.data || []).map((n) => (
                 <div
                   key={`${n.type}-${n.id}`}
-                  className={cn('rounded-lg border-2 border-border bg-card p-4 group relative hover:shadow-md transition-all')}
+                  className={cn('rounded-xl border-2 border-border bg-card p-4 group relative hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer')}
                 >
                   <button
                     type="button"
                     onClick={() => selectNodeAndReveal(n)}
-                    className={cn('w-full text-left hover:opacity-80 transition-opacity')}
+                    className={cn('w-full text-left')}
                   >
-                    <div className="text-sm font-medium text-foreground truncate">{n.name}</div>
-                    {n.meta ? <div className="mt-1 text-xs text-muted-foreground truncate">{n.meta}</div> : null}
-                    <div className="mt-2 text-[10px] text-muted-foreground uppercase tracking-wide">{n.type}</div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                          {n.type}
+                        </span>
+                        <div className="text-base font-semibold text-foreground mt-2 truncate">{n.name}</div>
+                        {n.meta ? <div className="mt-1 text-sm text-muted-foreground truncate">{n.meta}</div> : null}
+                      </div>
+                    </div>
                   </button>
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={(e) => {

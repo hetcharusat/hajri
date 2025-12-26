@@ -34,6 +34,14 @@ const MONTHS = [
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+// Helper function to format date as YYYY-MM-DD in local timezone (avoids UTC shift issues)
+function formatLocalDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function AcademicCalendar() {
   // State
   const [academicYears, setAcademicYears] = useState([])
@@ -147,7 +155,7 @@ export default function AcademicCalendar() {
 
   // Get events for a specific date
   function getEventsForDate(date) {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatLocalDate(date)
     const dayEvents = []
     
     // Single-day events
@@ -197,7 +205,7 @@ export default function AcademicCalendar() {
   // Check if date is non-teaching
   function isNonTeachingDay(date) {
     const dayOfWeek = date.getDay()
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatLocalDate(date)
     
     // Sunday is always off
     if (dayOfWeek === 0) return true
