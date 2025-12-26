@@ -368,15 +368,15 @@ BEGIN
     AS $fn$
     DECLARE
       teaching_count INTEGER := 0;
-      current_date DATE;
+      iter_date DATE;
     BEGIN
-      current_date := start_date;
+      iter_date := start_date;
       
-      WHILE current_date <= end_date LOOP
-        IF is_teaching_day(current_date, p_academic_year_id) THEN
+      WHILE iter_date <= end_date LOOP
+        IF is_teaching_day(iter_date, p_academic_year_id) THEN
           teaching_count := teaching_count + 1;
         END IF;
-        current_date := current_date + INTERVAL '1 day';
+        iter_date := iter_date + INTERVAL '1 day';
       END LOOP;
       
       RETURN teaching_count;
