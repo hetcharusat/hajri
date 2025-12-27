@@ -84,11 +84,15 @@ async def get_predictions(
             classes_to_recover=recovery
         ))
     
-    # Get semester end date
+    # Get semester end date from teaching_periods
+    # Query the current academic year's teaching period for the relevant semester
     semester_end = None
+    today = pendulum.now("UTC").date().isoformat()
+    
     semester_result = db.table("teaching_periods") \
         .select("end_date") \
-        .eq("is_current", True) \
+        .gte("end_date", today) \
+        .order("start_date") \
         .limit(1) \
         .execute()
     

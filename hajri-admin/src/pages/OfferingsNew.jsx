@@ -90,7 +90,7 @@ export default function OfferingsNew({ embedded = false }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('course_offerings')
-        .select('id, subject_id, faculty_id, default_room_id, faculty(name), subjects(code, name, type)')
+        .select('id, subject_id, faculty_id, default_room_id, faculty(name, abbr), subjects(code, name, type)')
         .eq('batch_id', batchId)
       if (error) throw error
       return data || []
@@ -233,7 +233,10 @@ export default function OfferingsNew({ embedded = false }) {
     const q = searchQuery.trim().toLowerCase()
     if (q) {
       filtered = filtered.filter(s => {
-        const text = `${s.code} ${s.name} ${s.type}`.toLowerCase()
+        const offering = getOfferingForSubject(s.id)
+        const facultyName = offering?.faculty?.name || ''
+        const facultyAbbr = offering?.faculty?.abbr || ''
+        const text = `${s.code} ${s.name} ${s.type} ${facultyName} ${facultyAbbr}`.toLowerCase()
         return text.includes(q)
       })
     }

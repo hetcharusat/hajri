@@ -1,0 +1,267 @@
+📁 FILE 0 — SYSTEM IDENTITY & INTENT
+You are designing a backend system called HAJRI Engine.
+
+HAJRI Engine is a headless, deterministic computation engine for a college attendance system.
+
+It does NOT:
+- render UI
+- perform OCR
+- manage admin CRUD
+- guess or infer data
+
+It ONLY:
+- enforces rules
+- reconciles data sources
+- computes attendance state
+- exposes JSON APIs
+
+The system must remain correct even when users forget days, upload OCR late, or change behavior.
+
+📁 FILE 1 — OVERALL SYSTEM ARCHITECTURE
+System components:
+
+1. Android App
+   - UI only
+   - Collects user input
+   - Displays computed data
+   - Never computes attendance logic
+
+2. OCR Service
+   - Stateless
+   - Image → JSON
+   - No database authority
+
+3. Admin Panel
+   - Defines academic structure
+   - Timetable, calendar, subjects, batches
+   - NEVER touches user attendance
+
+4. HAJRI Engine (this system)
+   - Reads from DB
+   - Applies rules
+   - Writes derived state
+
+
+Communication flow:
+
+Android App → OCR → App UI → DB (snapshots) → HAJRI Engine → DB (derived) → App
+
+📁 FILE 2 — TECHNOLOGY STACK (MANDATORY CHOICES)
+Language: Python 3.11+
+
+API Framework: FastAPI
+- async by default
+- OpenAPI support
+- clean request validation
+
+Database: Supabase (PostgreSQL)
+
+Database Access:
+- Raw SQL or SQLAlchemy Core
+- NO heavy ORM abstraction
+
+Validation:
+- Pydantic (input schemas, defensive validation)
+
+Date & Time:
+- pendulum OR python-dateutil
+- zoneinfo / pytz for timezone correctness
+
+Background Tasks:
+- FastAPI BackgroundTasks (or equivalent)
+- NO recompute in GET endpoints
+
+Auth:
+- Supabase JWT (Bearer token)
+- Engine trusts Supabase auth
+
+📁 FILE 3 — HEADLESS ENGINE PRINCIPLES
+HAJRI Engine is headless by design.
+
+Meaning:
+- JSON in, JSON out
+- Stateless requests
+- No session storage
+- No UI assumptions
+
+The engine must be usable by:
+- Android app
+- Web app
+- CLI
+- Postman
+
+without modification.
+
+📁 FILE 4 — DATA AUTHORITY & TRUTH HIERARCHY (CRITICAL)
+Truth priority (highest to lowest):
+
+1. OCR SNAPSHOT (confirmed by user)
+2. MANUAL ATTENDANCE (after snapshot)
+3. TIMETABLE (future expectation only)
+
+Rules:
+- OCR snapshot is the ONLY historical baseline
+- Manual data NEVER alters snapshot data
+- Timetable NEVER alters past attendance
+
+📁 FILE 5 — TIME & LOCKING RULES (NO EXCEPTIONS)
+Let T_snap = timestamp of latest confirmed OCR snapshot.
+
+Allowed:
+- Manual attendance where event_date > T_snap
+- New OCR snapshot at any time
+
+Forbidden:
+- Manual edits where event_date ≤ T_snap
+- Backfilling historical days
+- Partial edits inside snapshot range
+
+Violations must be REJECTED with policy explanation.
+
+📁 FILE 6 — SNAPSHOT MODEL (OCR INTEGRATION)
+OCR snapshot characteristics:
+- Subject-wise cumulative totals
+- present / total / percentage
+- No per-day resolution
+- No lecture-type resolution
+
+Snapshot rules:
+- Immutable after confirmation
+- Append-only
+- Latest snapshot replaces all historical baselines
+- Previous snapshots kept only for audit
+
+Edge cases:
+- If snapshot total decreases → require explicit user confirmation
+- If subject missing in snapshot → retain previous baseline for that subject
+
+📁 FILE 7 — MANUAL TRACKING MODEL
+Manual tracking:
+- Incremental
+- Day or period based
+- Allowed only AFTER snapshot
+
+Rules:
+- Must match timetable slots
+- Must respect calendar (holidays, off days)
+- Cannot exceed expected lectures
+- Cannot exist without a snapshot baseline
+
+📁 FILE 8 — ENGINE COMPUTATION PIPELINE (STRICT ORDER)
+STEP 1: Validate academic context
+- user must have ACTIVE context (batch, semester, year)
+
+STEP 2: Fetch latest OCR snapshot
+- If none exists → engine must not compute
+
+STEP 3: Enforce snapshot lock
+- Reject or ignore manual data before snapshot time
+
+STEP 4: Apply manual increments
+- Aggregate valid manual entries after snapshot
+
+STEP 5: Validate calendar
+- Exclude holidays, vacations, weekly offs
+- Flag mismatches, never auto-correct
+
+STEP 6: Compute current attendance
+- total   = snapshot.total + manual.total
+- present = snapshot.present + manual.present
+
+STEP 7: Predict future attendance
+- Use timetable + calendar forward only
+
+STEP 8: Persist derived state
+- Overwrite summary and prediction tables
+
+📁 FILE 9 — PREDICTION LOGIC (PURE MATH)
+Inputs:
+- current_present
+- current_total
+- remaining_possible_classes
+- required_percentage
+
+Logic:
+required_attendance = ceil(required_percentage × (current_total + remaining))
+must_attend = max(0, required_attendance - current_present)
+can_bunk = remaining - must_attend
+
+Constraints:
+- can_bunk ≥ 0
+- must_attend ≤ remaining
+
+📁 FILE 10 — API CONTRACT (HEADLESS)
+POST /snapshots/confirm
+- Input: confirmed OCR JSON
+- Action: save snapshot, trigger recompute
+
+POST /attendance/manual
+- Input: subject, date, present/absent
+- Reject if before snapshot
+- Trigger recompute
+
+GET /attendance/summary
+- Read-only
+- Fast
+- No compute
+
+GET /attendance/predictions
+- Read-only
+- Fast
+- No compute
+
+POST /engine/recompute
+- Internal/debug only
+
+📁 FILE 11 — ERROR & EXCEPTION POLICY
+Errors are POLICY VIOLATIONS, not crashes.
+
+Engine must:
+- Reject invalid actions
+- Explain violated rule
+- Suggest corrective action
+
+Engine must NEVER:
+- Partially write derived data
+- Mutate snapshot data
+- Silently ignore conflicts
+
+📁 FILE 12 — SEMESTER TRANSITION RULES
+When semester ends:
+- Context becomes READ-ONLY
+- Manual tracking disabled
+- No recomputation
+
+New semester:
+- New academic context
+- New OCR snapshot required
+- No data carryover
+
+📁 FILE 13 — PERFORMANCE & FREE-TIER GUARANTEES
+Design constraints:
+- Compute on WRITE, never on READ
+- Derived tables small & indexed
+- No heavy joins in hot paths
+
+Target:
+- 200–300 users / semester
+- Supabase free tier
+- Render free tier
+
+📁 FILE 14 — TESTING STRATEGY (MANDATORY)
+Testing layers:
+1. Pure logic tests (no DB)
+2. Snapshot-based DB tests
+3. Snapshot → manual → snapshot
+4. Holiday & calendar edge cases
+5. Semester rollover
+
+Engine must pass all before app integration.
+
+📁 FILE 15 — FINAL DESIGN GUARANTEE
+This design guarantees:
+- No double counting
+- No historical corruption
+- Deterministic behavior
+- Explainable outcomes
+- Safe scaling on free tiers

@@ -134,6 +134,7 @@ export function ThemedSelect({
   className,
   label,
   icon: Icon,
+  filterOption,
   ...props
 }) {
   // Find the selected option object from value
@@ -157,12 +158,21 @@ export function ThemedSelect({
         isDisabled={isDisabled}
         isLoading={isLoading}
         styles={customStyles}
+        filterOption={filterOption || defaultFilterOption}
         menuPlacement="auto"
         menuPosition="fixed"
         {...props}
       />
     </div>
   )
+}
+
+// Custom filter to search in both label and meta (abbr)
+const defaultFilterOption = (option, inputValue) => {
+  const q = inputValue.toLowerCase()
+  const label = (option.label || '').toLowerCase()
+  const meta = (option.data?.meta || '').toLowerCase()
+  return label.includes(q) || meta.includes(q)
 }
 
 // Format option with meta text (for faculty with abbreviation)

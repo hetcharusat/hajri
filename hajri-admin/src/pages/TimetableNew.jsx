@@ -895,7 +895,7 @@ export default function TimetableNew() {
       if (!supabase) throw new Error('Supabase not configured')
       const res = await supabase
         .from('course_offerings')
-        .select(`*, subjects(code, name, type, is_elective), faculty(name), rooms:default_room_id(room_number)`)
+        .select(`*, subjects(code, name, type, is_elective), faculty(name, abbr), rooms:default_room_id(room_number)`)
         .eq('batch_id', batchId)
         .order('created_at', { ascending: false })
       if (res.error) throw res.error
@@ -910,7 +910,7 @@ export default function TimetableNew() {
       if (!supabase) throw new Error('Supabase not configured')
       const res = await supabase
         .from('timetable_events')
-        .select(`id, version_id, offering_id, day_of_week, start_time, end_time, room_id, rooms:room_id(room_number), course_offerings(*, subjects(code, name, type, is_elective), faculty(name))`)
+        .select(`id, version_id, offering_id, day_of_week, start_time, end_time, room_id, rooms:room_id(room_number), course_offerings(*, subjects(code, name, type, is_elective), faculty(name, abbr))`)
         .eq('version_id', activeVersionId)
       if (res.error) throw res.error
       return res.data || []
@@ -966,7 +966,7 @@ export default function TimetableNew() {
     const q = searchQuery.trim().toLowerCase()
     if (q) {
       filtered = filtered.filter(o => {
-        const text = `${o.subjects?.code || ''} ${o.subjects?.name || ''} ${o.faculty?.name || ''} ${o.subjects?.type || ''}`.toLowerCase()
+        const text = `${o.subjects?.code || ''} ${o.subjects?.name || ''} ${o.faculty?.name || ''} ${o.faculty?.abbr || ''} ${o.subjects?.type || ''}`.toLowerCase()
         return text.includes(q)
       })
     }

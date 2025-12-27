@@ -1,17 +1,19 @@
 """
 Supabase JWT authentication for HAJRI Engine.
 Validates Bearer tokens from mobile app.
+Supports dev_mode for testing without real JWT.
 """
 
 from typing import Optional
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
 from app.config import get_settings
 
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)  # Don't auto-error, we handle it
+optional_security = HTTPBearer(auto_error=False)
 
 
 class AuthenticatedUser(BaseModel):
@@ -23,15 +25,36 @@ class AuthenticatedUser(BaseModel):
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security)
 ) -> AuthenticatedUser:
     """
     Validate Supabase JWT and extract user info.
+    In dev_mode, accepts test tokens and uses X-Student-ID header.
     
     Raises:
         HTTPException: If token is invalid or expired.
     """
     settings = get_settings()
+    
+    # Dev mode: accept test tokens
+    if settings.dev_mode:
+        if credentials and credentials.credentials.startswith("test-token-"):
+            # Extract test user ID from token
+            test_user_id = credentials.credentials.replace("test-token-", "")
+            # Use X-Student-ID header for student_id in dev mode
+            student_id = request.headers.get("X-Student-ID", "test-student-001")
+            return AuthenticatedUser(
+                user_id=test_user_id,
+                email="test@example.com",
+                student_id=student_id,
+                is_admin=True  # Allow all operations in dev mode
+            )
+    
+    # No credentials provided
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authorization header required")
+    
     token = credentials.credentials
     
     try:
@@ -90,7 +113,7 @@ class OptionalAuth:
     
     async def __call__(
         self,
-        credentials: Optional[HTTPAuthorizationCredentials] = Security(security, auto_error=False)
+        credentials: Optional[HTTPAuthorizationCredentials] = Security(optional_security)
     ) -> Optional[AuthenticatedUser]:
         if not credentials:
             return None

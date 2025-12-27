@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     
     # App settings
     debug: bool = False
+    dev_mode: bool = True  # Allow test requests without real JWT
     log_level: str = "INFO"
     
     # Timezone

@@ -330,7 +330,7 @@ export function TimetablePanel({ batchId, refreshKey }) {
         .select(`
           *,
           subjects(code, name, type),
-          faculty(name, email),
+          faculty(name, email, abbr),
           batches(batch_letter)
         `)
         .eq('batch_id', targetBatchId)
@@ -344,6 +344,7 @@ export function TimetablePanel({ batchId, refreshKey }) {
           subject_name: o.subjects?.name,
           component_type: o.subjects?.type || 'LECTURE',
           faculty_names: o.faculty ? [o.faculty.name] : [],
+          faculty_abbrs: o.faculty ? [o.faculty.abbr] : [],
           batch_letter: o.batches?.batch_letter,
           default_room_id: o.default_room_id,
         }))
@@ -408,7 +409,7 @@ export function TimetablePanel({ batchId, refreshKey }) {
           course_offerings!offering_id(
             id,
             subjects(code, name, type),
-            faculty(name),
+            faculty(name, abbr),
             batches(batch_letter)
           )
         `)
@@ -426,6 +427,7 @@ export function TimetablePanel({ batchId, refreshKey }) {
           subject_name: ev.course_offerings?.subjects?.name,
           component_type: ev.course_offerings?.subjects?.type || 'LECTURE',
           faculty: ev.course_offerings?.faculty?.name,
+          faculty_abbr: ev.course_offerings?.faculty?.abbr,
           batch_letters: ev.course_offerings?.batches?.batch_letter ? [ev.course_offerings.batches.batch_letter] : [],
         })
       }
@@ -553,7 +555,7 @@ export function TimetablePanel({ batchId, refreshKey }) {
     const q = offeringSearch.trim().toLowerCase()
     if (q) {
       filtered = filtered.filter((o) => {
-        const text = `${o.subject_code || ''} ${o.subject_name || ''} ${o.faculty_names?.join(' ') || ''} ${o.component_type || ''}`.toLowerCase()
+        const text = `${o.subject_code || ''} ${o.subject_name || ''} ${o.faculty_names?.join(' ') || ''} ${o.faculty_abbrs?.join(' ') || ''} ${o.component_type || ''}`.toLowerCase()
         return text.includes(q)
       })
     }
