@@ -217,6 +217,17 @@ DECLARE
   v_elective_group_id UUID;
   v_conflict RECORD;
 BEGIN
+  -- Optimization: Skip validation if slot-defining columns haven't changed
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.version_id = OLD.version_id AND 
+       NEW.day_of_week = OLD.day_of_week AND 
+       NEW.start_time = OLD.start_time AND 
+       NEW.end_time = OLD.end_time AND
+       NEW.offering_id = OLD.offering_id THEN
+      RETURN NEW;
+    END IF;
+  END IF;
+
   -- Get elective_group_id from the offering's subject
   SELECT s.elective_group_id INTO v_elective_group_id
   FROM course_offerings co
