@@ -202,14 +202,19 @@ async def get_summary(
         if row["snapshot_at"] and not snapshot_at:
             snapshot_at = row["snapshot_at"]
     
-    # Get semester name
-    semester_result = db.table("semesters") \
-        .select("name") \
-        .eq("id", context["semester_id"]) \
-        .single() \
-        .execute()
-    
-    semester_name = semester_result.data.get("name", "") if semester_result.data else ""
+    # Get semester number (schema uses semester_number, not name)
+    semester_name = ""
+    try:
+        semester_result = db.table("semesters") \
+            .select("semester_number") \
+            .eq("id", context["semester_id"]) \
+            .single() \
+            .execute()
+        if semester_result.data:
+            semester_name = f"Semester {semester_result.data.get('semester_number', '')}"
+    except Exception:
+        # If semester lookup fails, continue without it
+        pass
     
     return AttendanceSummaryResponse(
         student_id=user.student_id,

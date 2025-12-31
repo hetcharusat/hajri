@@ -62,7 +62,17 @@ export async function apiCall(method, endpoint, body = null, studentId = null) {
   const data = await response.json()
   
   if (!response.ok) {
-    throw new Error(data.detail || 'API Error')
+    // Handle PolicyViolation responses which have message, rule, suggestion
+    if (data.error === 'policy_violation') {
+      const parts = [data.message]
+      if (data.suggestion) parts.push(data.suggestion)
+      throw new Error(parts.join(' '))
+    }
+    // Handle standard FastAPI error responses
+    const errorMsg = typeof data.detail === 'string' 
+      ? data.detail 
+      : (data.message || JSON.stringify(data.detail) || 'API Error')
+    throw new Error(errorMsg)
   }
   
   return data

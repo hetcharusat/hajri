@@ -1,116 +1,126 @@
 """
 Pure prediction logic for HAJRI Engine.
 These functions are stateless and testable without database.
+
+SIMPLIFIED USER-FOCUSED PREDICTIONS:
+- can_bunk: How many classes you can SAFELY skip and still have 75%
+- must_attend: MINIMUM classes you MUST attend to reach 75% by semester end
+- classes_to_recover: If below 75%, how many consecutive classes to recover
 """
 
-from math import ceil
+from math import ceil, floor
 from typing import Tuple
-from app.models.enums import PredictionStatus
 
 
-def compute_prediction(
-    current_present: int,
-    current_total: int,
+def compute_simple_prediction(
+    present: int,
+    total: int,
     remaining_classes: int,
     required_percentage: float = 75.0
-) -> Tuple[int, int, PredictionStatus]:
+) -> dict:
     """
-    Compute must_attend and can_bunk for a subject.
+    Compute simple, clear predictions for a subject.
     
     Args:
-        current_present: Classes attended so far
-        current_total: Total classes held so far
+        present: Classes attended so far
+        total: Total classes held so far
         remaining_classes: Expected remaining classes in semester
         required_percentage: Target percentage (default 75%)
     
     Returns:
-        Tuple of (must_attend, can_bunk, status)
-    
-    Logic:
-        required_attendance = ceil(required_percentage × (current_total + remaining))
-        must_attend = max(0, required_attendance - current_present)
-        can_bunk = max(0, remaining - must_attend)
+        Dict with: can_bunk, must_attend, classes_to_recover, status
     
     Example:
-        Current: 30/40 (75%), Remaining: 20, Required: 75%
-        Total will be: 60
-        Required: ceil(0.75 × 60) = 45
-        Must attend: max(0, 45 - 30) = 15
-        Can bunk: max(0, 20 - 15) = 5
+        Current: 30/40 (75%), Remaining: 20
+        Semester Total: 60 classes
+        Required for 75%: 45 classes
+        
+        can_bunk = How many MORE absences allowed?
+          = 60 - 45 (allowed absences for 75%) - (40 - 30) current absences
+          = 15 - 10 = 5 bunkable
+        
+        must_attend = Minimum to attend from remaining
+          = max(0, 45 - 30) = 15
     """
     
-    # Handle edge cases
-    if remaining_classes < 0:
-        remaining_classes = 0
+    # Current percentage
+    current_pct = (present / total * 100) if total > 0 else 100.0
     
-    future_total = current_total + remaining_classes
+    # Semester total = current + remaining
+    semester_total = total + remaining_classes
     
-    # How many must be present to hit target
-    required_attendance = ceil((required_percentage / 100) * future_total)
+    # Required attendance for target percentage
+    # Use ceil to be safe (e.g., 75% of 60 = 45)
+    required_present = ceil((required_percentage / 100) * semester_total)
     
-    # How many more must attend
-    must_attend = max(0, required_attendance - current_present)
+    # Current absences
+    current_absences = total - present
     
-    # Can't attend more than remaining
+    # Max allowed absences for target percentage
+    max_allowed_absences = semester_total - required_present
+    
+    # How many more can you bunk? (absences budget remaining)
+    can_bunk = max(0, max_allowed_absences - current_absences)
+    
+    # But can't bunk more than remaining classes
+    can_bunk = min(can_bunk, remaining_classes)
+    
+    # Minimum classes must attend from remaining
+    # = required_present - present (what you still need)
+    must_attend = max(0, required_present - present)
+    
+    # But can't exceed remaining classes
     if must_attend > remaining_classes:
-        must_attend = remaining_classes
+        must_attend = remaining_classes  # Even attending all won't be enough
     
-    # How many can skip
-    can_bunk = max(0, remaining_classes - must_attend)
+    # If already below threshold, calculate recovery
+    classes_to_recover = None
+    if current_pct < required_percentage and total > 0:
+        classes_to_recover = compute_recovery_classes(present, total, required_percentage)
     
-    # Determine status based on current percentage
-    current_percentage = (current_present / current_total * 100) if current_total > 0 else 0
-    
-    if current_percentage >= 80:
-        status = PredictionStatus.SAFE
-    elif current_percentage >= 75:
-        status = PredictionStatus.WARNING
-    elif current_percentage >= 65:
-        status = PredictionStatus.DANGER
+    # Simple status
+    if current_pct >= 75:
+        status = "SAFE"
+    elif current_pct >= 65:
+        status = "LOW"
     else:
-        status = PredictionStatus.CRITICAL
+        status = "CRITICAL"
     
-    return (must_attend, can_bunk, status)
+    return {
+        "can_bunk": can_bunk,
+        "must_attend": must_attend,
+        "classes_to_recover": classes_to_recover,
+        "status": status,
+        "semester_total": semester_total,
+        "classes_remaining": remaining_classes
+    }
 
 
 def compute_recovery_classes(
-    current_present: int,
-    current_total: int,
+    present: int,
+    total: int,
     required_percentage: float = 75.0
 ) -> int:
     """
-    Calculate minimum classes needed to reach required percentage.
-    Returns 0 if already above threshold.
+    If below required %, how many consecutive classes to attend to recover?
     
-    This is useful when a student is below the required percentage
-    and wants to know how many consecutive classes they need to attend.
-    
-    Formula:
-        Let x = additional classes (all attended)
-        (current_present + x) / (current_total + x) >= required_percentage / 100
-        
-        Solving for x:
-        x >= (required_percentage * current_total - 100 * current_present) / (100 - required_percentage)
+    Formula: (present + x) / (total + x) = required_percentage / 100
+    Solving: x = (required% * total - 100 * present) / (100 - required%)
     """
-    
-    if current_total == 0:
+    if total == 0:
         return 0
     
-    current_percentage = (current_present / current_total) * 100
-    
-    if current_percentage >= required_percentage:
+    current_pct = (present / total) * 100
+    if current_pct >= required_percentage:
         return 0
     
-    # Solve for x
-    numerator = (required_percentage * current_total) - (100 * current_present)
+    numerator = (required_percentage * total) - (100 * present)
     denominator = 100 - required_percentage
     
     if denominator == 0:
-        return 0  # 100% required is impossible to recover
+        return 0
     
-    x = numerator / denominator
-    
-    return max(0, ceil(x))
+    return max(0, ceil(numerator / denominator))
 
 
 def compute_percentage(present: int, total: int) -> float:
@@ -120,13 +130,33 @@ def compute_percentage(present: int, total: int) -> float:
     return round((present / total) * 100, 2)
 
 
-def determine_status(percentage: float) -> PredictionStatus:
-    """Determine attendance health status from percentage."""
-    if percentage >= 80:
-        return PredictionStatus.SAFE
-    elif percentage >= 75:
-        return PredictionStatus.WARNING
+def determine_simple_status(percentage: float) -> str:
+    """Simple 3-tier status."""
+    if percentage >= 75:
+        return "SAFE"
     elif percentage >= 65:
-        return PredictionStatus.DANGER
+        return "LOW"
     else:
-        return PredictionStatus.CRITICAL
+        return "CRITICAL"
+
+
+# Keep old function for backward compatibility but mark deprecated
+def compute_prediction(
+    current_present: int,
+    current_total: int,
+    remaining_classes: int,
+    required_percentage: float = 75.0
+) -> Tuple[int, int, str]:
+    """
+    DEPRECATED: Use compute_simple_prediction instead.
+    Kept for backward compatibility.
+    """
+    result = compute_simple_prediction(
+        current_present, current_total, remaining_classes, required_percentage
+    )
+    return (result["must_attend"], result["can_bunk"], result["status"])
+
+
+def determine_status(percentage: float):
+    """DEPRECATED: Use determine_simple_status instead."""
+    return determine_simple_status(percentage)

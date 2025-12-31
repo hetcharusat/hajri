@@ -126,47 +126,91 @@ class AttendanceSummaryResponse(BaseModel):
 
 
 # =============================================================================
-# PREDICTION SCHEMAS
+# PREDICTION SCHEMAS - SIMPLIFIED FOR USER CLARITY
 # =============================================================================
 
-class SubjectPrediction(BaseModel):
-    """Prediction for a single subject."""
+class SubjectAttendance(BaseModel):
+    """
+    Simple attendance view for a subject - mimics college dashboard.
+    Shows: Present / Total = Percentage%
+    """
     subject_id: str
     subject_code: str
     subject_name: str
+    class_type: str  # LECTURE, LAB, TUTORIAL
     
-    # Current state
-    current_present: int
-    current_total: int
-    current_percentage: float
+    # Current attendance (like college dashboard)
+    present: int = Field(..., description="Classes attended")
+    total: int = Field(..., description="Total classes held")
+    percentage: float = Field(..., description="Current attendance %")
     
-    # Target
-    required_percentage: float = 75.0
+    # Simple status: SAFE (>=75%), LOW (<75%), CRITICAL (<65%)
+    status: str = Field(..., description="SAFE / LOW / CRITICAL")
     
-    # Predictions
-    remaining_classes: int
-    must_attend: int
-    can_bunk: int
+
+class SubjectPrediction(BaseModel):
+    """
+    Clear predictions for a subject.
+    User wants to know: "Can I bunk?" and "How many must I attend?"
+    """
+    subject_id: str
+    subject_code: str
+    subject_name: str
+    class_type: str
     
-    # Status
-    status: PredictionStatus
+    # Current state (mirror of college dashboard)
+    present: int
+    total: int
+    percentage: float
     
-    # If critical, how many more needed to recover
-    classes_to_recover: Optional[int] = None
+    # THE KEY NUMBERS USER CARES ABOUT:
+    can_bunk: int = Field(..., description="Classes you CAN safely skip and still have 75%")
+    must_attend: int = Field(..., description="Minimum classes you MUST attend for 75%")
+    
+    # Context
+    classes_remaining: int = Field(..., description="Expected classes left in semester")
+    semester_total: int = Field(..., description="Expected total classes by semester end")
+    
+    # If below 75%, how many consecutive classes to recover
+    classes_to_recover: Optional[int] = Field(None, description="If below 75%, attend this many to recover")
+    
+    # Simple status
+    status: str = Field(..., description="SAFE / LOW / CRITICAL")
+
+
+class AttendanceDashboardResponse(BaseModel):
+    """
+    Main dashboard response - shows current attendance like college portal.
+    """
+    student_name: Optional[str] = None
+    semester: str
+    last_updated: datetime
+    
+    # Overall stats
+    overall_present: int
+    overall_total: int
+    overall_percentage: float
+    
+    # Per-subject current attendance
+    subjects: List[SubjectAttendance]
 
 
 class PredictionsResponse(BaseModel):
-    """All predictions for a student."""
+    """
+    Predictions response - tells user what they can/must do.
+    """
     student_id: str
-    semester_end_date: Optional[date]
+    semester: str
+    semester_end: Optional[date] = None
+    classes_remaining_in_semester: int
     
+    # Summary - quick glance
+    total_can_bunk: int = Field(..., description="Total classes you can safely skip across all subjects")
+    total_must_attend: int = Field(..., description="Total minimum classes you must attend")
+    subjects_at_risk: int = Field(..., description="Subjects below 75%")
+    
+    # Per-subject predictions
     subjects: List[SubjectPrediction]
-    
-    # Summary
-    safe_count: int
-    warning_count: int
-    danger_count: int
-    critical_count: int
     
     computed_at: datetime
 

@@ -88,18 +88,23 @@ async def aggregate_manual_entries(
     subject_id: str
 ) -> Dict[str, int]:
     """
-    Aggregate manual attendance entries for a subject AFTER the snapshot.
+    Aggregate manual attendance entries for a subject AFTER the snapshot date.
+    
+    We get ALL manual entries for this student/subject that are 
+    AFTER the snapshot date (not filtering by snapshot_id, since 
+    manual entries should persist across snapshots).
     
     Returns:
         Dict with present, absent, total counts.
     """
-    # Get manual entries after snapshot time for this subject
+    # Get manual entries after snapshot date for this subject
+    # Note: We don't filter by snapshot_id because manual entries should
+    # persist across snapshot updates. We filter by date instead.
     result = db.table("manual_attendance") \
         .select("*") \
         .eq("student_id", student_id) \
-        .eq("snapshot_id", snapshot_id) \
         .eq("subject_id", subject_id) \
-        .gte("event_date", snapshot_time.date().isoformat()) \
+        .gt("event_date", snapshot_time.date().isoformat()) \
         .execute()
     
     present = 0
@@ -124,20 +129,17 @@ async def get_remaining_classes(
     db: Client,
     batch_id: str,
     subject_id: str,
-    from_date: date
+    from_date: date,
+    semester_id: str = None
 ) -> int:
     """
     Calculate remaining expected classes for a subject.
-    Uses timetable + academic calendar.
+    Uses timetable + semester dates.
     
     Returns:
         Number of remaining teaching slots.
     """
     settings = get_settings()
-    
-    # Get semester end date
-    # For now, assume end of current semester from academic calendar
-    # This is a simplified version - should use count_teaching_days() function
     
     # Get timetable events for this subject
     result = db.table("timetable_events") \
@@ -148,21 +150,38 @@ async def get_remaining_classes(
     
     weekly_slots = len(result.data or [])
     
-    # Estimate remaining weeks (simplified)
-    # In production, this should use the calendar functions
+    if weekly_slots == 0:
+        return 0
+    
     today = pendulum.now(settings.default_timezone).date()
     
-    # Get semester end date from teaching_periods or estimate
-    semester_result = db.table("teaching_periods") \
-        .select("end_date") \
-        .eq("is_current", True) \
-        .limit(1) \
-        .execute()
+    # Try to get semester end date
+    end_date = None
     
-    if semester_result.data:
-        end_date = pendulum.parse(semester_result.data[0]["end_date"]).date()
-    else:
-        # Default: assume 16 weeks semester, estimate 8 weeks remaining
+    # First try: Get from semester table if semester_id provided
+    if semester_id:
+        semester_result = db.table("semesters") \
+            .select("end_date") \
+            .eq("id", semester_id) \
+            .limit(1) \
+            .execute()
+        
+        if semester_result.data and semester_result.data[0].get("end_date"):
+            end_date = pendulum.parse(semester_result.data[0]["end_date"]).date()
+    
+    # Second try: Get from teaching_periods (newest one)
+    if not end_date:
+        period_result = db.table("teaching_periods") \
+            .select("end_date") \
+            .order("end_date", desc=True) \
+            .limit(1) \
+            .execute()
+        
+        if period_result.data and period_result.data[0].get("end_date"):
+            end_date = pendulum.parse(period_result.data[0]["end_date"]).date()
+    
+    # Fallback: assume 8 weeks remaining
+    if not end_date:
         end_date = today.add(weeks=8)
     
     # Count weeks remaining
@@ -211,11 +230,15 @@ async def recompute_for_student(
         snapshot_entries = snapshot.get("entries", [])
         
         # Build lookup from snapshot entries by subject code
+        # Support both "course_code" (OCR format) and "subject_code" (test format)
         snapshot_by_code = {}
         for entry in snapshot_entries:
-            code = entry.get("course_code")
+            code = entry.get("course_code") or entry.get("subject_code")
+            class_type = entry.get("class_type", "LECTURE")
             if code:
-                snapshot_by_code[code] = entry
+                # Key by code+class_type to handle both lecture and lab
+                key = f"{code}_{class_type}"
+                snapshot_by_code[key] = entry
         
         # Step 3: Get subjects for this batch
         subjects = await get_subjects_for_batch(db, batch_id, semester_id)
@@ -230,8 +253,9 @@ async def recompute_for_student(
             subject_code = subject["code"]
             class_type = subject.get("type", "LECTURE")
             
-            # Find snapshot entry for this subject
-            snap_entry = snapshot_by_code.get(subject_code)
+            # Find snapshot entry for this subject using code + class_type key
+            key = f"{subject_code}_{class_type}"
+            snap_entry = snapshot_by_code.get(key)
             
             if snap_entry:
                 snap_present = snap_entry.get("present", 0)
@@ -264,7 +288,7 @@ async def recompute_for_student(
             
             # Step 6: Compute predictions
             remaining = await get_remaining_classes(
-                db, batch_id, subject_id, snapshot_time.date()
+                db, batch_id, subject_id, snapshot_time.date(), semester_id
             )
             
             must_attend, can_bunk, status = compute_prediction(

@@ -210,7 +210,29 @@ export default function AcademicCalendar() {
     // Sunday is always off
     if (dayOfWeek === 0) return true
     
-    // Check weekly off days
+    // Saturday - check pattern
+    if (dayOfWeek === 6) {
+      const saturdayEntry = weeklyOffDays.find(w => w.day_of_week === 6)
+      const pattern = saturdayEntry?.saturday_pattern || 'all'
+      
+      if (pattern === 'all') return true
+      if (pattern === 'none') return false
+      
+      // Calculate which Saturday of the month this is
+      const firstOfMonth = new Date(date.getFullYear(), date.getMonth(), 1)
+      const firstSaturdayOffset = (6 - firstOfMonth.getDay() + 7) % 7
+      const firstSaturday = new Date(date.getFullYear(), date.getMonth(), 1 + firstSaturdayOffset)
+      const saturdayNum = Math.floor((date.getDate() - firstSaturday.getDate()) / 7) + 1
+      
+      if (pattern === '1st_3rd') return saturdayNum === 1 || saturdayNum === 3
+      if (pattern === '2nd_4th') return saturdayNum === 2 || saturdayNum === 4
+      if (pattern === 'odd') return saturdayNum === 1 || saturdayNum === 3 || saturdayNum === 5
+      if (pattern === 'even') return saturdayNum === 2 || saturdayNum === 4
+      
+      return saturdayEntry?.is_off ?? true
+    }
+    
+    // Check weekly off days (Mon-Fri)
     if (weeklyOffDays.some(w => w.day_of_week === dayOfWeek && w.is_off)) return true
     
     // Check holidays
@@ -843,12 +865,17 @@ export default function AcademicCalendar() {
             </p>
             <div className="flex flex-wrap gap-2">
               {DAYS.map((day, idx) => {
-                const isOff = idx === 0 || weeklyOffDays.some(w => w.day_of_week === idx && w.is_off)
+                const saturdayEntry = weeklyOffDays.find(w => w.day_of_week === 6)
+                const saturdayPattern = saturdayEntry?.saturday_pattern || 'all'
+                // For Saturday (idx=6), show as off only if pattern is 'all'
+                const isOff = idx === 0 || 
+                  (idx === 6 ? saturdayPattern === 'all' : weeklyOffDays.some(w => w.day_of_week === idx && w.is_off))
                 return (
                   <button
                     key={day}
-                    disabled={idx === 0} // Sunday always off
+                    disabled={idx === 0 || idx === 6} // Sunday always off, Saturday uses pattern selector
                     onClick={async () => {
+                      if (idx === 6) return // Saturday handled by pattern selector
                       const existing = weeklyOffDays.find(w => w.day_of_week === idx)
                       if (existing) {
                         await supabase.from('weekly_off_days').update({ is_off: !isOff }).eq('id', existing.id)
@@ -866,13 +893,67 @@ export default function AcademicCalendar() {
                       isOff
                         ? 'bg-red-500/20 border-red-500/30 text-red-400'
                         : 'bg-muted/50 border-border text-foreground hover:bg-muted',
-                      idx === 0 && 'opacity-50 cursor-not-allowed'
+                      (idx === 0 || idx === 6) && 'opacity-50 cursor-not-allowed'
                     )}
                   >
                     {day}
                   </button>
                 )
               })}
+            </div>
+            
+            {/* Saturday Pattern Selector */}
+            <div className="mt-4 pt-4 border-t border-border">
+              <h4 className="text-sm font-medium mb-2">Saturday Schedule</h4>
+              <p className="text-xs text-muted-foreground mb-3">
+                Some departments follow "1st & 3rd Saturday off" or similar patterns.
+              </p>
+              <select
+                value={weeklyOffDays.find(w => w.day_of_week === 6)?.saturday_pattern || 'all'}
+                onChange={async (e) => {
+                  const pattern = e.target.value
+                  const existing = weeklyOffDays.find(w => w.day_of_week === 6)
+                  const isOff = pattern !== 'none'
+                  
+                  if (existing) {
+                    await supabase.from('weekly_off_days')
+                      .update({ is_off: isOff, saturday_pattern: pattern })
+                      .eq('id', existing.id)
+                  } else {
+                    await supabase.from('weekly_off_days').insert({
+                      academic_year_id: selectedYear.id,
+                      day_of_week: 6,
+                      is_off: isOff,
+                      saturday_pattern: pattern,
+                    })
+                  }
+                  fetchCalendarData()
+                }}
+                className="w-full max-w-xs h-9 px-3 rounded-md border border-border bg-background text-sm"
+              >
+                <option value="all">All Saturdays Off</option>
+                <option value="none">No Saturdays Off (All Working)</option>
+                <option value="1st_3rd">1st & 3rd Saturday Off</option>
+                <option value="2nd_4th">2nd & 4th Saturday Off</option>
+                <option value="odd">Odd Saturdays Off (1st, 3rd, 5th)</option>
+                <option value="even">Even Saturdays Off (2nd, 4th)</option>
+              </select>
+              {(() => {
+                const pattern = weeklyOffDays.find(w => w.day_of_week === 6)?.saturday_pattern || 'all'
+                const patternLabels = {
+                  'all': 'Every Saturday is a holiday',
+                  'none': 'All Saturdays are working days',
+                  '1st_3rd': '1st & 3rd Saturday of each month are holidays',
+                  '2nd_4th': '2nd & 4th Saturday of each month are holidays',
+                  'odd': '1st, 3rd & 5th Saturday of each month are holidays',
+                  'even': '2nd & 4th Saturday of each month are holidays',
+                }
+                return (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ℹ️ {patternLabels[pattern] || patternLabels['all']}
+                  </p>
+                )
+              })()}
             </div>
           </div>
           
