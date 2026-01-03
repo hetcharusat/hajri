@@ -103,26 +103,11 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Request tracking middleware
 app.add_middleware(RequestTrackingMiddleware)
 
-# CORS middleware - explicitly list origins for credentials support
+# CORS middleware - allow all origins for API access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev server (test portal)
-        "http://localhost:5174",   # Admin portal
-        "http://localhost:3000",   # Alternative dev port
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:8000",
-        # Production origins
-        "https://hajri-admin.netlify.app",
-        "https://hajri-admin.vercel.app",
-        "https://hajri-engine.onrender.com",
-        "https://hajri-x8ag.onrender.com",
-        # Allow any Vercel preview URLs
-        "https://*.vercel.app",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=False,  # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
