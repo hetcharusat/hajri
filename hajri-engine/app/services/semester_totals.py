@@ -125,8 +125,8 @@ async def get_teaching_period_for_semester(
 
 async def get_weekly_off_settings(
     db: Client,
-    academic_year_id: str,
-    batch_id: str = None
+    academic_year_id: Optional[str],
+    batch_id: Optional[str] = None
 ) -> Dict:
     """
     Get weekly off settings for a batch or academic year.
@@ -240,16 +240,25 @@ async def get_non_teaching_dates(
     db: Client,
     start_date: date,
     end_date: date,
-    batch_id: str = None
-) -> Tuple[List[date], Dict]:
+    batch_id: Optional[str] = None
+) -> Tuple[List[date], Dict, Dict]:
     """
     Get all non-teaching dates in a range.
     Uses weekly_off_settings, calendar_events, vacation_periods, exam_periods.
     
     Returns:
-        Tuple of (list of non-teaching dates, weekly_off_settings used)
+        Tuple of (list of non-teaching dates, weekly_off_settings, breakdown_details)
+        breakdown_details contains categorized non-teaching days with names
     """
     non_teaching = set()
+    breakdown = {
+        "sundays": [],
+        "saturdays": [],
+        "holidays": [],
+        "vacations": [],
+        "exams": [],
+        "other_weekly_offs": []
+    }
     
     # Get academic year
     year_result = db.table("academic_years") \
@@ -277,25 +286,36 @@ async def get_non_teaching_dates(
     }
     saturday_pattern = weekly_settings.get("saturday_pattern", "all")
     
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    
     # Iterate through all dates and apply weekly off logic
     current = start_date
     while current <= end_date:
         py_weekday = current.weekday()  # Monday=0, ..., Saturday=5, Sunday=6
         
-        # Check fixed weekly off days (Mon-Fri, Sun)
-        if py_weekday != 5 and weekly_off_days.get(py_weekday, False):
+        # Sunday
+        if py_weekday == 6 and weekly_off_days.get(6, True):
             non_teaching.add(current)
-        # Check Saturday using pattern
-        elif py_weekday == 5:  # Saturday
+            breakdown["sundays"].append(current.isoformat())
+        # Saturday using pattern
+        elif py_weekday == 5:
             if is_saturday_off(current, saturday_pattern):
                 non_teaching.add(current)
+                breakdown["saturdays"].append(current.isoformat())
+        # Other weekdays
+        elif weekly_off_days.get(py_weekday, False):
+            non_teaching.add(current)
+            breakdown["other_weekly_offs"].append({
+                "date": current.isoformat(),
+                "day": day_names[py_weekday]
+            })
         
         current = pendulum.instance(datetime.combine(current, datetime.min.time())).add(days=1).date()
     
     if academic_year_id:
-        # Get holidays
+        # Get holidays with names (column is 'title' not 'name')
         holidays = db.table("calendar_events") \
-            .select("event_date, end_date") \
+            .select("event_date, end_date, title, event_type") \
             .eq("academic_year_id", academic_year_id) \
             .eq("is_non_teaching", True) \
             .gte("event_date", start_date.isoformat()) \
@@ -305,40 +325,69 @@ async def get_non_teaching_dates(
         for h in holidays.data or []:
             h_start = pendulum.parse(h["event_date"]).date()
             h_end = pendulum.parse(h.get("end_date") or h["event_date"]).date()
+            holiday_name = h.get("title", "Holiday")
+            
+            # Add to breakdown (once per event, not per day)
+            breakdown["holidays"].append({
+                "name": holiday_name,
+                "start_date": h_start.isoformat(),
+                "end_date": h_end.isoformat() if h_end != h_start else None,
+                "type": h.get("event_type", "holiday")
+            })
+            
             current = h_start
             while current <= h_end and current <= end_date:
                 non_teaching.add(current)
                 current = pendulum.instance(datetime.combine(current, datetime.min.time())).add(days=1).date()
         
-        # Get vacation periods
+        # Get vacation periods with names
         vacations = db.table("vacation_periods") \
-            .select("start_date, end_date") \
+            .select("start_date, end_date, name") \
             .eq("academic_year_id", academic_year_id) \
             .execute()
         
         for v in vacations.data or []:
             v_start = max(pendulum.parse(v["start_date"]).date(), start_date)
             v_end = min(pendulum.parse(v["end_date"]).date(), end_date)
-            current = v_start
-            while current <= v_end:
-                non_teaching.add(current)
-                current = pendulum.instance(datetime.combine(current, datetime.min.time())).add(days=1).date()
+            
+            if v_start <= v_end:  # Only include if overlaps with semester
+                breakdown["vacations"].append({
+                    "name": v.get("name", "Vacation"),
+                    "start_date": v_start.isoformat(),
+                    "end_date": v_end.isoformat(),
+                    "days": (v_end - v_start).days + 1
+                })
+                
+                current = v_start
+                while current <= v_end:
+                    non_teaching.add(current)
+                    current = pendulum.instance(datetime.combine(current, datetime.min.time())).add(days=1).date()
         
-        # Get exam periods
+        # Get exam periods with names
         exams = db.table("exam_periods") \
-            .select("start_date, end_date") \
+            .select("start_date, end_date, name, exam_type") \
             .eq("academic_year_id", academic_year_id) \
             .execute()
         
         for e in exams.data or []:
             e_start = max(pendulum.parse(e["start_date"]).date(), start_date)
             e_end = min(pendulum.parse(e["end_date"]).date(), end_date)
-            current = e_start
-            while current <= e_end:
-                non_teaching.add(current)
-                current = pendulum.instance(datetime.combine(current, datetime.min.time())).add(days=1).date()
+            
+            if e_start <= e_end:  # Only include if overlaps with semester
+                breakdown["exams"].append({
+                    "name": e.get("name", "Exams"),
+                    "type": e.get("exam_type", "exam"),
+                    "start_date": e_start.isoformat(),
+                    "end_date": e_end.isoformat(),
+                    "days": (e_end - e_start).days + 1
+                })
+                
+                current = e_start
+                while current <= e_end:
+                    non_teaching.add(current)
+                    current = pendulum.instance(datetime.combine(current, datetime.min.time())).add(days=1).date()
     
-    return sorted(list(non_teaching)), weekly_settings
+    return sorted(list(non_teaching)), weekly_settings, breakdown
 
 
 async def calculate_semester_totals(
@@ -385,8 +434,8 @@ async def calculate_semester_totals(
     start_date = pendulum.parse(period["start_date"]).date()
     end_date = pendulum.parse(period["end_date"]).date()
     
-    # Step 3: Get non-teaching dates (now includes weekly off settings)
-    non_teaching_dates, weekly_settings = await get_non_teaching_dates(db, start_date, end_date, batch_id)
+    # Step 3: Get non-teaching dates (now includes weekly off settings and breakdown)
+    non_teaching_dates, weekly_settings, non_teaching_breakdown = await get_non_teaching_dates(db, start_date, end_date, batch_id)
     non_teaching_set = set(non_teaching_dates)
     
     # Step 4: For each subject, count actual teaching slots
@@ -424,13 +473,26 @@ async def calculate_semester_totals(
             "slots_per_week": slots_info["slots_per_week"],
             "day_slots": day_slots,
             "total_weeks": total_weeks,
+            "teaching_weeks": total_weeks,  # Alias for clarity
             "total_days": total_days,
             "non_teaching_days": len(non_teaching_dates),
             "total_classes_in_semester": total_classes,
             "calculation_details": {
                 "semester_start": start_date.isoformat(),
                 "semester_end": end_date.isoformat(),
-                "teaching_days_by_weekday": days_by_week
+                "total_calendar_days": total_days,
+                "teaching_weeks": total_weeks,
+                "non_teaching_days_excluded": len(non_teaching_dates),
+                "teaching_days_by_weekday": days_by_week,
+                "formula": f"{slots_info['slots_per_week']} slots/week across {total_weeks} weeks, excluding {len(non_teaching_dates)} non-teaching days",
+                "non_teaching_breakdown": {
+                    "sundays_count": len(non_teaching_breakdown["sundays"]),
+                    "saturdays_count": len(non_teaching_breakdown["saturdays"]),
+                    "holidays": non_teaching_breakdown["holidays"],
+                    "vacations": non_teaching_breakdown["vacations"],
+                    "exams": non_teaching_breakdown["exams"],
+                    "saturday_pattern": weekly_settings.get("saturday_pattern", "all")
+                }
             }
         }
     
@@ -453,6 +515,7 @@ async def persist_semester_totals(
     count = 0
     
     for subject_id, data in totals.items():
+        # Note: teaching_weeks is stored in calculation_details JSONB, not a separate column
         db.table("semester_subject_totals").upsert({
             "batch_id": batch_id,
             "semester_id": semester_id,

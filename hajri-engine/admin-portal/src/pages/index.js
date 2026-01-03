@@ -1,0 +1,7 @@
+export { Dashboard } from './Dashboard'
+export { SemesterTotals } from './SemesterTotals'
+export { Batches } from './Batches'
+export { Predictions } from './Predictions'
+export { Logs } from './Logs'
+export { Debug } from './Debug'
+export { Settings } from './Settings'

@@ -337,16 +337,58 @@ async def get_semester_totals(
     """
     Get precomputed semester totals for a batch.
     """
+    return await _get_semester_totals_impl(db, batch_id, semester_id)
+
+
+@router.get("/test/semester-totals/{batch_id}/{semester_id}")
+async def test_get_semester_totals(
+    batch_id: str,
+    semester_id: str,
+    db: Client = Depends(get_db)
+):
+    """
+    Get precomputed semester totals for a batch - NO AUTH for testing.
+    """
+    return await _get_semester_totals_impl(db, batch_id, semester_id)
+
+
+async def _get_semester_totals_impl(db: Client, batch_id: str, semester_id: str):
+    """Internal implementation for getting semester totals."""
     result = db.table("semester_subject_totals") \
-        .select("*, subjects(code, name)") \
+        .select("*, subjects(code, name, type)") \
         .eq("batch_id", batch_id) \
         .eq("semester_id", semester_id) \
         .execute()
     
+    # Format the response with proper subject info
+    totals = []
+    for row in (result.data or []):
+        subj = row.get("subjects", {}) or {}
+        # Try both possible column names for backward compatibility
+        total_classes = row.get("total_classes_in_semester") or row.get("total_expected", 0)
+        calc_details = row.get("calculation_details", {}) or {}
+        
+        # Extract teaching_weeks from calculation_details since column doesn't exist
+        teaching_weeks = calc_details.get("teaching_weeks")
+        
+        totals.append({
+            "id": row.get("id"),
+            "subject_id": row.get("subject_id"),
+            "subject_code": subj.get("code", "Unknown"),
+            "subject_name": subj.get("name"),
+            "class_type": row.get("class_type", subj.get("type", "LECTURE")),
+            "slots_per_week": row.get("slots_per_week", 0),
+            "total_classes_in_semester": total_classes,
+            "teaching_weeks": teaching_weeks,
+            "calculated_at": row.get("calculated_at"),
+            "calculation_details": calc_details
+        })
+    
     return {
         "batch_id": batch_id,
         "semester_id": semester_id,
-        "subjects": result.data or []
+        "count": len(totals),
+        "totals": totals
     }
 
 
@@ -777,16 +819,25 @@ async def test_get_batch_details(
                 .execute()
             events = events_result.data or []
             
-            # Summarize by subject
+            # Summarize by subject + type (so LAB and LECTURE show separately)
             for e in events:
                 subj = e.get("course_offerings", {}).get("subjects", {})
                 code = subj.get("code", "Unknown")
-                if code not in weekly_summary:
-                    weekly_summary[code] = {"name": subj.get("name"), "type": subj.get("type"), "slots_per_week": 0, "days": []}
-                weekly_summary[code]["slots_per_week"] += 1
+                subj_type = subj.get("type", "LECTURE")
+                # Use code + type as key to separate LAB and LECTURE entries
+                key = f"{code}|{subj_type}"
+                if key not in weekly_summary:
+                    weekly_summary[key] = {
+                        "code": code,
+                        "name": subj.get("name"), 
+                        "type": subj_type, 
+                        "slots_per_week": 0, 
+                        "days": []
+                    }
+                weekly_summary[key]["slots_per_week"] += 1
                 # DB uses 0=Monday, 1=Tuesday, ..., 5=Saturday, 6=Sunday
                 day_name = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][e.get("day_of_week", 0)]
-                weekly_summary[code]["days"].append(day_name)
+                weekly_summary[key]["days"].append(day_name)
         
         # Get students in this batch
         students = db.table("students") \
