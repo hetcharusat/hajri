@@ -118,6 +118,9 @@ app.add_middleware(
         "https://hajri-admin.netlify.app",
         "https://hajri-admin.vercel.app",
         "https://hajri-engine.onrender.com",
+        "https://hajri-x8ag.onrender.com",
+        # Allow any Vercel preview URLs
+        "https://*.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -200,6 +203,13 @@ async def health_check():
             "required_percentage": settings.default_required_percentage
         }
     }
+
+
+# Render health check endpoint (lightweight)
+@app.get("/healthz")
+async def healthz():
+    """Lightweight health check for Render."""
+    return {"status": "ok"}
 
 
 # Stats endpoint for admin
