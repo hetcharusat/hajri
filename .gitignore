@@ -48,7 +48,7 @@ Thumbs.db
 temp/
 tmp/
 *.tmp
-debuggin-for.sql 
+debuggin-for.sql
 
 
 # Note: sql-queries/ used to be ignored but is now tracked for schema versioning
