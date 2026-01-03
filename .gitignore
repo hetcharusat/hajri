@@ -49,7 +49,7 @@ temp/
 tmp/
 *.tmp
 debuggin-for.sql
-
+temp.sql
 
 # Note: sql-queries/ used to be ignored but is now tracked for schema versioning
 # Sensitive data should not be stored in SQL files - use environment variables
