@@ -236,12 +236,157 @@ app = FastAPI(
 
 @app.get("/")
 async def root():
-    # Convenience entrypoint:
-    # - When debug UI is enabled, go to admin login -> debug console.
-    # - Otherwise, show the lightweight ping/status page.
-    if ENABLE_DEBUG_UI:
-        return RedirectResponse(url="/admin/login?next=/debug.html", status_code=303)
-    return RedirectResponse(url="/ping.html", status_code=303)
+    """Hub landing page with links to all HAJRI services."""
+    return HTMLResponse(content="""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HAJRI - Attendance Management System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        .logo {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        h1 {
+            color: #f8fafc;
+            font-size: 42px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 12px;
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 18px;
+            font-weight: 400;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 16px;
+            padding: 28px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: block;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(99, 102, 241, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        .card-icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
+        .card-title {
+            color: #f8fafc;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .card-desc {
+            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .card-url {
+            color: #6366f1;
+            font-size: 12px;
+            margin-top: 12px;
+            font-family: monospace;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 48px;
+            color: #64748b;
+            font-size: 14px;
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        .badge.internal {
+            background: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📊</div>
+            <h1>HAJRI</h1>
+            <p class="subtitle">College Attendance Management System</p>
+        </div>
+        
+        <div class="grid">
+            <a href="https://hajriadmin.vercel.app" class="card" target="_blank">
+                <div class="card-icon">🗄️</div>
+                <div class="card-title">Database Admin <span class="badge">Live</span></div>
+                <div class="card-desc">Manage academic data - departments, branches, semesters, subjects, timetables, and calendar events.</div>
+                <div class="card-url">hajriadmin.vercel.app</div>
+            </a>
+            
+            <a href="https://hajriengine.vercel.app" class="card" target="_blank">
+                <div class="card-icon">⚙️</div>
+                <div class="card-title">Engine Admin <span class="badge">Live</span></div>
+                <div class="card-desc">Attendance engine controls - semester totals calculator, predictions, and real-time calculations.</div>
+                <div class="card-url">hajriengine.vercel.app</div>
+            </a>
+            
+            <a href="/admin/login?next=/debug.html" class="card">
+                <div class="card-icon">📷</div>
+                <div class="card-title">OCR Admin <span class="badge internal">Internal</span></div>
+                <div class="card-desc">OCR tuning console - test image processing, course mapping, and attendance extraction.</div>
+                <div class="card-url">hajri.onrender.com/admin</div>
+            </a>
+            
+            <a href="https://hajridocs.vercel.app" class="card" target="_blank">
+                <div class="card-icon">📚</div>
+                <div class="card-title">Documentation <span class="badge">Live</span></div>
+                <div class="card-desc">Complete system documentation - architecture, API reference, deployment guides.</div>
+                <div class="card-url">hajridocs.vercel.app</div>
+            </a>
+        </div>
+        
+        <div class="footer">
+            <p>HAJRI Engine v0.2.0 • Built for Gujarat Technological University</p>
+        </div>
+    </div>
+</body>
+</html>
+    """, status_code=200)
 
 # CORS middleware
 app.add_middleware(
