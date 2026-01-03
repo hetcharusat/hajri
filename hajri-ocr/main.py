@@ -381,7 +381,7 @@ async def root():
         </div>
         
         <div class="footer">
-            <p>HAJRI Engine v0.2.0 • Built for Gujarat Technological University</p>
+            <p>HAJRI Engine v0.2.0 • Built for Charotar University of Science and Technology</p>
         </div>
     </div>
 </body>
