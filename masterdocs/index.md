@@ -1,66 +1,89 @@
 ---
 layout: home
 
-title: Hajri Documentation
+title: HAJRI Documentation
 
-description: Master documentation for Hajri Admin Portal + Hajri OCR
+description: Complete documentation for HAJRI - Attendance Tracking & Prediction System
 
 hero:
-  name: "Hajri Documentation"
-  text: "Everything about the Admin Portal and OCR system"
-  tagline: "Architecture, schema, workflows, roadmap, and full chat context"
+  name: "HAJRI Documentation"
+  text: "Attendance Tracking & Prediction System"
+  tagline: "Admin Portal • Engine API • Mobile Integration • Schema Reference"
   actions:
     - theme: brand
       text: Getting Started
       link: /getting-started/
     - theme: alt
-      text: Admin Portal
-      link: /hajri-admin/
+      text: API Reference
+      link: /hajri-engine/API
 
 features:
-  - title: Hajri Admin Portal
-    details: Complete guide including deployment, OAuth setup, performance optimization, V2 schema, and timetable editor workflows.
-  - title: Hajri OCR
-    details: FastAPI OCR backend architecture, endpoints, and deployment notes.
-  - title: Production Ready
-    details: Live deployment guides, OAuth troubleshooting, performance optimization, and comprehensive documentation.
+  - title: 📱 Mobile App Ready
+    details: Complete API documentation and integration guides for building mobile apps with HAJRI Engine.
+  - title: 🗄️ Complete Schema
+    details: 40+ tables documented with relationships, constraints, and example queries.
+  - title: 🚀 Production Deployed
+    details: All services live on Render and Vercel with OAuth authentication.
 ---
 
-## Start Here
+## Production URLs
 
-- If you’re switching accounts or onboarding: start in **Getting Started**.
-- If you need every decision and issue history: open **Chat Context**.
-- If you’re working on the timetable/editor/schema: start in **Admin Portal** docs.
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Hub** | [hajri.onrender.com](https://hajri.onrender.com) | Landing page with all links |
+| **Documentation** | [hajridocs.vercel.app](https://hajridocs.vercel.app) | This documentation |
+| **Database Admin** | [hajriadmin.vercel.app](https://hajriadmin.vercel.app) | Manage departments, classes, timetables |
+| **Engine Admin** | [hajriengine.vercel.app](https://hajriengine.vercel.app) | Test portal for engine |
+| **Engine API** | [hajri-x8ag.onrender.com/engine](https://hajri-x8ag.onrender.com/engine) | REST API |
+| **OCR API** | [hajri.onrender.com](https://hajri.onrender.com) | OCR service |
 
-### Quick Links
+## Quick Start for Mobile App Development
 
-- [Getting Started](/getting-started/)
-- [Quick Start](/QUICK_START)
-- [Chat Context](/CHAT_CONTEXT)
-- [Admin Portal Overview](/hajri-admin/)
-- [🚀 Deployment Guide](/hajri-admin/DEPLOYMENT)
-- [🔐 OAuth Setup](/hajri-admin/OAUTH)
-- [⚡ Performance Guide](/hajri-admin/PERFORMANCE)
-- [Admin Architecture](/hajri-admin/ARCHITECTURE)
-- [Schema V2](/hajri-admin/SCHEMA_V2)
-- [Roadmap](/hajri-admin/ROADMAP)
-- [OCR Overview](/hajri-ocr/)
+```javascript
+// 1. Initialize Supabase
+import { createClient } from '@supabase/supabase-js';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-## Recent Updates (Dec 24, 2024)
+// 2. Get predictions
+const { data: { session } } = await supabase.auth.getSession();
+const predictions = await fetch(
+  'https://hajri-x8ag.onrender.com/engine/predictions',
+  { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+).then(r => r.json());
+```
 
-**Production Deployment ✅**
-- Live at: https://hajriadmin.netlify.app
-- OAuth configured with Google Cloud Console
-- Fixed OAuth redirect issues (localhost → production)
-- Performance optimizations applied
+📖 **Full Guide:** [Mobile App Integration](/hajri-engine/MOBILE_APP)
 
-**New Documentation 📚**
-- [Deployment Guide](/hajri-admin/DEPLOYMENT) - Complete Netlify deployment walkthrough
-- [OAuth & Authentication](/hajri-admin/OAUTH) - Google OAuth setup and troubleshooting
-- [Performance Optimization](/hajri-admin/PERFORMANCE) - Caching, memoization, build optimization
+## Documentation Map
 
-**Code Optimizations ⚡**
-- React Query caching: 5min staleTime, 10min cacheTime (~80% reduction in API calls)
-- Component memoization with useMemo and React.memo
-- Code splitting for optimal bundle sizes
-- Removed debug logs for production
+### For Mobile App Developers
+- [**API Reference**](/hajri-engine/API) - All 32 endpoints with examples
+- [**Mobile App Guide**](/hajri-engine/MOBILE_APP) - React Native / Flutter integration
+- [**Schema Reference**](/hajri-admin/SCHEMA) - Complete database schema
+
+### For Admin Portal
+- [**Admin Overview**](/hajri-admin/) - Portal features and architecture
+- [**Deployment**](/hajri-admin/DEPLOYMENT) - Vercel/Netlify deployment
+- [**OAuth Setup**](/hajri-admin/OAUTH) - Google OAuth configuration
+
+### For Engine Development
+- [**Engine Overview**](/hajri-engine/) - Architecture and data flow
+- [**Test Portal**](/hajri-engine/TEST_PORTAL) - Testing guide
+- [**Data Flow**](/hajri-engine/DATAFLOW) - How data moves
+
+## Recent Updates (January 4, 2026)
+
+**📱 Mobile App Documentation**
+- New [Mobile App Guide](/hajri-engine/MOBILE_APP) with complete integration examples
+- Updated [API Reference](/hajri-engine/API) with all 32 endpoints
+- New [Schema Reference](/hajri-admin/SCHEMA) with 40+ tables
+
+**🚀 Production Deployment**
+- All services deployed and running
+- OAuth authentication working
+- CORS configured for all origins
+
+**🗄️ Schema Updates**
+- Complete documentation of all tables
+- Example queries for common operations
+- Known issues and limitations documented

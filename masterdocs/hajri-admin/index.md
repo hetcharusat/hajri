@@ -1,20 +1,26 @@
 ---
-title: Hajri Admin Portal
+title: HAJRI Admin Portal
 ---
 
-# Hajri Admin Portal
+# HAJRI Admin Portal
+
+> **Production:** https://hajriadmin.vercel.app  
+> **Last Updated:** January 4, 2026
 
 A React + Supabase admin panel for managing academic data and building timetables.
 
 ## Core Documentation
 
+### Schema & Data
+- [**Schema Reference**](/hajri-admin/SCHEMA) - Complete database schema (40+ tables)
+- [Schema V2](/hajri-admin/SCHEMA_V2) - Original V2 design notes
+
 ### Architecture & Design
 - [Architecture](/hajri-admin/ARCHITECTURE) - System design and component structure
-- [Schema V2](/hajri-admin/SCHEMA_V2) - Database schema and relationships
 - [Workflows](/hajri-admin/WORKFLOWS) - Admin workflows and user journeys
 
 ### Deployment & Operations
-- [Deployment Guide](/hajri-admin/DEPLOYMENT) - Complete Netlify deployment guide
+- [Deployment Guide](/hajri-admin/DEPLOYMENT) - Complete Vercel/Netlify deployment guide
 - [OAuth & Authentication](/hajri-admin/OAUTH) - Google OAuth setup and troubleshooting
 - [Performance Optimization](/hajri-admin/PERFORMANCE) - Caching, memoization, and build optimization
 

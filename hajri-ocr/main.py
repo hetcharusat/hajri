@@ -629,7 +629,7 @@ async def admin_login(next: Optional[str] = None, err: Optional[str] = None):
                             </div>
                             <input type="hidden" name="next" value="{nxt}" />
                             <button type="submit">Login</button>
-                            <div class="hint">Tip: set <strong>ADMIN_USERS_JSON</strong> and <strong>ADMIN_COOKIE_SECRET</strong> in production.</div>
+                            <div class="hint">Enter <strong> Admin's Provided Credentials,</strong>If Not Provided Contact Support</div>
                         </form>
                     </div>
                 </div>
