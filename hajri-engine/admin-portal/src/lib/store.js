@@ -1,5 +1,16 @@
 import { create } from 'zustand'
 
+// Auth store for user state
+export const useAuthStore = create((set) => ({
+  user: null,
+  session: null,
+  loading: true,
+  setUser: (user) => set({ user }),
+  setSession: (session) => set({ session }),
+  setLoading: (loading) => set({ loading }),
+  signOut: () => set({ user: null, session: null })
+}))
+
 export const useAppStore = create((set, get) => ({
   // Health status
   health: null,
