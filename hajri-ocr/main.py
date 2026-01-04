@@ -810,6 +810,169 @@ async def delete_course(code: str):
     return {"ok": True, "deleted": deleted}
 
 
+# ============================================================================
+# SUPABASE SYNC ENDPOINTS
+# ============================================================================
+
+_supabase_client = None
+
+def _get_supabase():
+    """Lazily initialize Supabase client."""
+    global _supabase_client
+    if _supabase_client is None:
+        if not settings.supabase_url or not settings.supabase_anon_key:
+            raise HTTPException(
+                status_code=503,
+                detail="Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env"
+            )
+        try:
+            from supabase import create_client
+            _supabase_client = create_client(settings.supabase_url, settings.supabase_anon_key)
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=f"Failed to connect to Supabase: {e}")
+    return _supabase_client
+
+
+@app.get("/supabase/status", dependencies=[Depends(require_debug_admin)])
+async def supabase_status():
+    """Check if Supabase is configured and reachable."""
+    configured = bool(settings.supabase_url and settings.supabase_anon_key)
+    if not configured:
+        return {
+            "configured": False,
+            "message": "Set SUPABASE_URL and SUPABASE_ANON_KEY in .env to enable sync"
+        }
+    try:
+        client = _get_supabase()
+        # Simple query to check connection
+        result = client.table("subjects").select("id").limit(1).execute()
+        return {"configured": True, "connected": True, "message": "Supabase connected"}
+    except Exception as e:
+        return {"configured": True, "connected": False, "message": str(e)}
+
+
+@app.get("/supabase/subjects", dependencies=[Depends(require_debug_admin)])
+async def list_supabase_subjects(semester_id: Optional[str] = None):
+    """
+    Fetch subjects from Supabase database.
+    Optionally filter by semester_id.
+    Returns subjects with code, name, abbreviation, type.
+    """
+    try:
+        client = _get_supabase()
+        query = client.table("subjects").select(
+            "id, code, name, abbreviation, type, is_elective, credits, "
+            "semesters(id, semester_number, branches(id, name, abbreviation))"
+        ).order("code")
+        
+        if semester_id:
+            query = query.eq("semester_id", semester_id)
+        
+        result = query.execute()
+        return {
+            "subjects": result.data or [],
+            "count": len(result.data) if result.data else 0
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch subjects: {e}")
+
+
+@app.post("/supabase/sync", dependencies=[Depends(require_debug_admin)])
+async def sync_from_supabase(semester_id: Optional[str] = None):
+    """
+    Sync subjects from Supabase to local course_config.json.
+    This replaces all courses with database subjects (that have abbreviations).
+    
+    - If semester_id provided: sync only that semester's subjects
+    - If no semester_id: sync ALL subjects from database
+    
+    Only subjects with abbreviation field set will be synced.
+    """
+    try:
+        client = _get_supabase()
+        query = client.table("subjects").select(
+            "code, name, abbreviation, type"
+        ).not_.is_("abbreviation", "null")
+        
+        if semester_id:
+            query = query.eq("semester_id", semester_id)
+        
+        result = query.execute()
+        
+        if not result.data:
+            return {
+                "ok": True,
+                "synced": 0,
+                "message": "No subjects with abbreviations found. Add abbreviations in Admin Panel → Subjects."
+            }
+        
+        # Build new courses dict
+        new_courses = {}
+        for subject in result.data:
+            code = subject.get("code", "").strip().upper()
+            name = subject.get("name", "").strip()
+            abbr = subject.get("abbreviation", "").strip()
+            if code and name and abbr:
+                new_courses[code] = {"name": name, "abbr": abbr}
+        
+        # Load existing config to preserve validation settings
+        config_path = APP_DIR / "course_config.json"
+        doc = {}
+        if config_path.exists():
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    doc = json.load(f)
+            except Exception:
+                doc = {}
+        
+        # Replace courses, keep validation settings
+        doc["courses"] = new_courses
+        if "validation" not in doc:
+            doc["validation"] = {"fuzzy_match_threshold": 0.75}
+        
+        # Write back
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(doc, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        
+        # Reload into extractor
+        extractor.course_db = _load_course_db()
+        
+        return {
+            "ok": True,
+            "synced": len(new_courses),
+            "courses": new_courses,
+            "message": f"Successfully synced {len(new_courses)} subjects from database"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {e}")
+
+
+@app.get("/supabase/semesters", dependencies=[Depends(require_debug_admin)])
+async def list_semesters():
+    """
+    List all semesters (for filtering subjects by semester during sync).
+    """
+    try:
+        client = _get_supabase()
+        result = client.table("semesters").select(
+            "id, semester_number, branches(id, name, abbreviation)"
+        ).order("branches(name)").order("semester_number").execute()
+        
+        return {
+            "semesters": result.data or [],
+            "count": len(result.data) if result.data else 0
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch semesters: {e}")
+
+
 @app.middleware("http")
 async def _metrics_middleware(request: Request, call_next):
     global TOTAL_REQUESTS, LAST_REQUEST_AT

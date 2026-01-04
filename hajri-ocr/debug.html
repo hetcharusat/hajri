@@ -644,6 +644,23 @@
                     <div class="dt-block-title">Course Mapping</div>
                     <div class="hint">Add / edit / remove courses (writes to <span class="mono">course_config.json</span>). Requires admin session.</div>
 
+                    <!-- Database Sync Section -->
+                    <div style="margin-top:12px; padding:10px; border-radius:6px; background:rgba(138,180,248,0.08); border:1px solid rgba(138,180,248,0.25);">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                            <span style="font-weight:600; font-size:12px;">📥 Sync from Database</span>
+                            <span class="chip" id="supabaseStatus">checking...</span>
+                        </div>
+                        <div class="hint" style="margin-bottom:8px;">Import subjects from Supabase. Only subjects with abbreviations set in Admin Panel will be synced.</div>
+                        <div class="row" style="gap:8px;">
+                            <select class="input mono" id="syncSemester" style="flex:1; max-width:200px;">
+                                <option value="">All Semesters</option>
+                            </select>
+                            <button class="btn primary" id="btnSyncSubjects" type="button">Sync Now</button>
+                            <button class="btn" id="btnCheckSupabase" type="button">Check Status</button>
+                        </div>
+                        <div class="hint mono" id="syncStatus" style="margin-top:6px;"></div>
+                    </div>
+
                     <div class="mini-grid" style="margin-top:10px;">
                         <div class="k mono">Code</div>
                         <input class="input mono" id="courseCode" placeholder="CEUC201" />
@@ -1032,6 +1049,94 @@
         btnCourseSave?.addEventListener('click', () => saveCourse());
         btnCourseClear?.addEventListener('click', () => clearCourseInputs());
         btnCourseRefresh?.addEventListener('click', () => refreshCourses());
+
+        // ========== Supabase Sync ==========
+        const supabaseStatus = el('supabaseStatus');
+        const syncSemester = el('syncSemester');
+        const btnSyncSubjects = el('btnSyncSubjects');
+        const btnCheckSupabase = el('btnCheckSupabase');
+        const syncStatus = el('syncStatus');
+
+        function setSyncStatus(msg, type = '') {
+            if (syncStatus) {
+                syncStatus.textContent = msg;
+                syncStatus.style.color = type === 'ok' ? 'var(--good)' : type === 'bad' ? 'var(--bad)' : 'var(--muted)';
+            }
+        }
+
+        async function checkSupabaseStatus() {
+            if (supabaseStatus) supabaseStatus.textContent = 'checking...';
+            supabaseStatus?.classList.remove('ok', 'bad', 'warn');
+            try {
+                const res = await fetch('/supabase/status', { credentials: 'include' });
+                const data = await res.json();
+                if (data.connected) {
+                    supabaseStatus.textContent = 'connected';
+                    supabaseStatus?.classList.add('ok');
+                    // Load semesters
+                    await loadSemesters();
+                } else if (data.configured) {
+                    supabaseStatus.textContent = 'error';
+                    supabaseStatus?.classList.add('bad');
+                    setSyncStatus(data.message || 'Connection failed', 'bad');
+                } else {
+                    supabaseStatus.textContent = 'not configured';
+                    supabaseStatus?.classList.add('warn');
+                    setSyncStatus('Set SUPABASE_URL and SUPABASE_ANON_KEY in .env', 'bad');
+                }
+            } catch (e) {
+                supabaseStatus.textContent = 'error';
+                supabaseStatus?.classList.add('bad');
+                setSyncStatus(e?.message || 'Failed to check status', 'bad');
+            }
+        }
+
+        async function loadSemesters() {
+            try {
+                const res = await fetch('/supabase/semesters', { credentials: 'include' });
+                const data = await res.json();
+                if (syncSemester && data.semesters) {
+                    syncSemester.innerHTML = '<option value="">All Semesters</option>';
+                    for (const sem of data.semesters) {
+                        const branch = sem.branches?.abbreviation || sem.branches?.name || '?';
+                        const label = `${branch} - Sem ${sem.semester_number}`;
+                        const opt = document.createElement('option');
+                        opt.value = sem.id;
+                        opt.textContent = label;
+                        syncSemester.appendChild(opt);
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to load semesters:', e);
+            }
+        }
+
+        async function syncFromSupabase() {
+            const semId = syncSemester?.value || '';
+            setSyncStatus('syncing...', '');
+            btnSyncSubjects?.setAttribute('disabled', 'true');
+            try {
+                const url = semId ? `/supabase/sync?semester_id=${encodeURIComponent(semId)}` : '/supabase/sync';
+                const res = await fetch(url, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || `HTTP ${res.status}`);
+                }
+                setSyncStatus(`✓ Synced ${data.synced} subjects`, 'ok');
+                await refreshCourses();
+            } catch (e) {
+                setSyncStatus(`✗ ${e?.message || e}`, 'bad');
+            } finally {
+                btnSyncSubjects?.removeAttribute('disabled');
+            }
+        }
+
+        btnSyncSubjects?.addEventListener('click', () => syncFromSupabase());
+        btnCheckSupabase?.addEventListener('click', () => checkSupabaseStatus());
+
+        // Check Supabase status on page load
+        setTimeout(() => checkSupabaseStatus(), 500);
+        // ========== End Supabase Sync ==========
 
         courseTbody?.addEventListener('click', (ev) => {
             const t = ev.target;

@@ -351,6 +351,7 @@ CREATE TABLE subjects (
   semester_id UUID NOT NULL REFERENCES semesters(id),
   code TEXT NOT NULL,
   name TEXT NOT NULL,
+  abbreviation TEXT,  -- Short name for OCR matching (e.g., "EM-I")
   credits INTEGER DEFAULT 3,
   type TEXT DEFAULT 'LECTURE' CHECK (type IN ('LECTURE', 'LAB', 'TUTORIAL')),
   is_elective BOOLEAN DEFAULT false,
@@ -364,6 +365,7 @@ CREATE TABLE subjects (
 |--------|------|-------------|
 | `code` | TEXT | Subject code (e.g., "MSUD102") |
 | `name` | TEXT | Full name (e.g., "Engineering Mathematics II") |
+| `abbreviation` | TEXT | Short name for OCR matching (e.g., "EM-II") |
 | `type` | TEXT | LECTURE, LAB, or TUTORIAL |
 | `is_elective` | BOOLEAN | True for elective subjects |
 | `elective_group_id` | UUID | Links electives that share a slot |
@@ -372,6 +374,9 @@ CREATE TABLE subjects (
 - `LECTURE` - Theory classes (default)
 - `LAB` - Practical sessions
 - `TUTORIAL` - Discussion/problem-solving
+
+**OCR Integration:**
+The `abbreviation` field is used by hajri-ocr to match subjects during attendance extraction. See [hajri-ocr/OVERVIEW.md](../hajri-ocr/OVERVIEW.md) for sync details.
 
 ---
 

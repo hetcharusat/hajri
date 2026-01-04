@@ -104,9 +104,13 @@ cp .env.example .env
 
 Edit `.env`:
 ```dotenv
-# Required
+# Required - PaddleOCR API
 PADDLEOCR_VL_API_URL=https://your-paddleocr-api.com/layout-parsing
 PADDLEOCR_VL_API_TOKEN=your-api-token
+
+# Optional - Supabase Sync (for importing subjects from database)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
 
 # Optional (development)
 ENV=development
@@ -222,32 +226,83 @@ curl -X POST http://localhost:8000/extract \
 ### Course Mapping
 **File:** `course_config.json`
 
-**Purpose:** Map abbreviated course codes to full names
+**Purpose:** Map abbreviated course codes to full names for OCR matching
 
 **Example:**
 ```json
 {
-  "CS101": {
-    "name": "Data Structures",
-    "code": "CS101"
+  "courses": {
+    "CEUC101": {
+      "name": "COMPUTER CONCEPTS AND PROGRAMMING",
+      "abbr": "CCP"
+    },
+    "MSUD101": {
+      "name": "ENGINEERING MATHEMATICS I",
+      "abbr": "EM-I"
+    }
   },
-  "CS201": {
-    "name": "Algorithms",
-    "code": "CS201"
-  },
-  "EE101": {
-    "name": "Circuits",
-    "code": "EE101"
+  "validation": {
+    "fuzzy_match_threshold": 0.75
   }
 }
 ```
 
-**Usage:**
-```python
-from config import course_config
+### Database Sync (NEW!)
 
-full_name = course_config.get("CS101", {}).get("name", "Unknown")
+**Purpose:** Automatically sync course mappings from Supabase database instead of manually editing JSON
+
+**Prerequisites:**
+1. Run migration: `15-subject-abbreviations.sql` (adds `abbreviation` column to subjects table)
+2. Set environment variables in `.env`:
+   ```dotenv
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_ANON_KEY=your-anon-key
+   ```
+
+**Admin Panel Setup:**
+1. Go to hajriadmin.vercel.app → Subjects
+2. Add/edit subjects with **Abbreviation** field (e.g., "CCP", "EM-I", "DAA")
+3. Only subjects with abbreviations will be synced
+
+**Sync Methods:**
+
+**1. Debug UI (Recommended):**
+1. Go to hajri.onrender.com/debug.html
+2. Find "Sync from Database" section
+3. Select semester (or "All Semesters")
+4. Click "Sync Now"
+
+**2. API Endpoint:**
+```bash
+# Sync all subjects with abbreviations
+curl -X POST https://hajri.onrender.com/supabase/sync \
+  -H "X-Admin-Key: your-admin-key"
+
+# Sync specific semester
+curl -X POST "https://hajri.onrender.com/supabase/sync?semester_id=uuid" \
+  -H "X-Admin-Key: your-admin-key"
 ```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "synced": 15,
+  "courses": {
+    "CEUC101": {"name": "COMPUTER CONCEPTS AND PROGRAMMING", "abbr": "CCP"},
+    "MSUD101": {"name": "ENGINEERING MATHEMATICS I", "abbr": "EM-I"}
+  },
+  "message": "Successfully synced 15 subjects from database"
+}
+```
+
+**Sync Endpoints:**
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/supabase/status` | GET | Check if Supabase is configured and connected |
+| `/supabase/subjects` | GET | List all subjects from database |
+| `/supabase/semesters` | GET | List all semesters (for filtering) |
+| `/supabase/sync` | POST | Sync subjects to course_config.json |
 
 ---
 

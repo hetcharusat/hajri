@@ -19,6 +19,7 @@ export default function Subjects() {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
+    abbreviation: '',
     credits: 3,
     type: 'LECTURE',
     is_elective: false
@@ -79,6 +80,7 @@ export default function Subjects() {
         .insert([{
           code: formData.code.trim().toUpperCase(),
           name: formData.name.trim(),
+          abbreviation: formData.abbreviation.trim().toUpperCase() || null,
           semester_id: semesterId,
           credits: parseInt(formData.credits),
           type: formData.type,
@@ -88,7 +90,7 @@ export default function Subjects() {
       if (error) throw error
 
       await fetchData(semesterId)
-      setFormData({ code: '', name: '', credits: 3, type: 'LECTURE', is_elective: false })
+      setFormData({ code: '', name: '', abbreviation: '', credits: 3, type: 'LECTURE', is_elective: false })
     } catch (e) {
       setError(e.message)
     } finally {
@@ -117,6 +119,7 @@ export default function Subjects() {
     setEditFormData({
       code: subject.code,
       name: subject.name,
+      abbreviation: subject.abbreviation || '',
       credits: subject.credits,
       type: subject.type,
       is_elective: subject.is_elective || false
@@ -135,6 +138,7 @@ export default function Subjects() {
         .update({
           code: editFormData.code.trim().toUpperCase(),
           name: editFormData.name.trim(),
+          abbreviation: editFormData.abbreviation?.trim().toUpperCase() || null,
           credits: parseInt(editFormData.credits),
           type: editFormData.type,
           is_elective: editFormData.is_elective
@@ -159,10 +163,11 @@ export default function Subjects() {
   }
 
   const exportToCSV = () => {
-    const headers = ['code', 'name', 'branch', 'semester', 'credits', 'type', 'is_elective']
+    const headers = ['code', 'name', 'abbreviation', 'branch', 'semester', 'credits', 'type', 'is_elective']
     const rows = subjects.map(s => [
       s.code,
       s.name,
+      s.abbreviation || '',
       s.semesters?.branches?.abbreviation || '',
       s.semesters?.semester_number || '',
       s.credits,
@@ -233,7 +238,7 @@ export default function Subjects() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleAdd} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="code">Subject Code *</Label>
                   <Input
@@ -256,6 +261,19 @@ export default function Subjects() {
                     required
                     disabled={!semesterId}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="abbreviation">Abbreviation (OCR)</Label>
+                  <Input
+                    id="abbreviation"
+                    placeholder="ITP"
+                    value={formData.abbreviation}
+                    onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value })}
+                    disabled={!semesterId}
+                    className="font-mono uppercase"
+                  />
+                  <p className="text-xs text-muted-foreground">Short name for OCR matching</p>
                 </div>
               </div>
 
@@ -407,12 +425,21 @@ export default function Subjects() {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Code</Label>
                 <Input
                   value={editFormData.code || ''}
                   onChange={(e) => setEditFormData({ ...editFormData, code: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Abbreviation</Label>
+                <Input
+                  value={editFormData.abbreviation || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, abbreviation: e.target.value })}
+                  placeholder="OCR short name"
+                  className="font-mono uppercase"
                 />
               </div>
               <div className="space-y-2">
@@ -491,6 +518,7 @@ function SubjectsTable({ subjects, onEdit, onDelete, isElective = false }) {
           <TableRow>
             <TableHead>Code</TableHead>
             <TableHead>Name</TableHead>
+            <TableHead>Abbr</TableHead>
             <TableHead>Credits</TableHead>
             <TableHead>Type</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -504,6 +532,15 @@ function SubjectsTable({ subjects, onEdit, onDelete, isElective = false }) {
                 {subject.code}
               </TableCell>
               <TableCell>{subject.name}</TableCell>
+              <TableCell>
+                {subject.abbreviation ? (
+                  <span className="font-mono text-xs px-2 py-0.5 rounded bg-accent text-accent-foreground">
+                    {subject.abbreviation}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">—</span>
+                )}
+              </TableCell>
               <TableCell>{subject.credits}</TableCell>
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${

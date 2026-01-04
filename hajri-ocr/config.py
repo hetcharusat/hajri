@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: str = "http://localhost:3000,http://localhost:5173"
     
+    # Supabase (for syncing subjects from database)
+    supabase_url: str = ""  # Set in .env: SUPABASE_URL
+    supabase_anon_key: str = ""  # Set in .env: SUPABASE_ANON_KEY
+    
     class Config:
         env_file = str(Path(__file__).resolve().parent / ".env")
         case_sensitive = False
