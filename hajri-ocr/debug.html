@@ -1136,6 +1136,9 @@
 
         // Check Supabase status on page load
         setTimeout(() => checkSupabaseStatus(), 500);
+        
+        // Load courses on page load
+        setTimeout(() => refreshCourses(), 100);
         // ========== End Supabase Sync ==========
 
         courseTbody?.addEventListener('click', (ev) => {
