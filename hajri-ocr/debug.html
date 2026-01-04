@@ -946,6 +946,16 @@
             }
         }
 
+        // Short alias for HTML escaping
+        function esc(s) {
+            return (s ?? '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function _courseRowHtml(code, c) {
             const name = (c?.name ?? '').toString();
             const abbr = (c?.abbr ?? '').toString();
@@ -993,7 +1003,7 @@
                 courseTbody.innerHTML = keys.map(k => _courseRowHtml(k, courses[k])).join('');
                 setCourseStatus(`loaded (${keys.length})`, 'ok');
             } catch (e) {
-                courseTbody.innerHTML = `<tr><td colspan="4" class="hint">Failed to load courses: ${esc(e?.message || e)}</td></tr>`;
+                courseTbody.innerHTML = `<tr><td colspan="4" class="hint">Failed to load courses: ${htmlEscape(e?.message || e)}</td></tr>`;
                 setCourseStatus(`load failed: ${e?.message || e}`, 'bad');
             }
         }
