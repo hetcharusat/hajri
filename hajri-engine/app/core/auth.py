@@ -2,6 +2,11 @@
 Supabase JWT authentication for HAJRI Engine.
 Validates Bearer tokens from mobile app.
 Supports dev_mode for testing without real JWT.
+
+Auth Flow:
+1. Decode JWT to get user_id (sub claim)
+2. Lookup app_users table to get student_id
+3. Return AuthenticatedUser with student_id
 """
 
 from typing import Optional
@@ -10,6 +15,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
 from app.config import get_settings
+from app.core.database import get_supabase_client
 
 
 security = HTTPBearer(auto_error=False)  # Don't auto-error, we handle it
@@ -30,6 +36,7 @@ async def get_current_user(
 ) -> AuthenticatedUser:
     """
     Validate Supabase JWT and extract user info.
+    Looks up student_id from app_users table (not JWT metadata).
     In dev_mode, accepts test tokens and uses X-Student-ID header.
     
     Raises:
@@ -71,13 +78,27 @@ async def get_current_user(
             raise HTTPException(status_code=401, detail="Invalid token: no user ID")
         
         # Extract user metadata
-        user_metadata = payload.get("user_metadata", {})
         app_metadata = payload.get("app_metadata", {})
+        
+        # Look up student_id from app_users table
+        student_id = None
+        try:
+            db = get_supabase_client()
+            result = db.table("app_users") \
+                .select("student_id") \
+                .eq("id", user_id) \
+                .maybe_single() \
+                .execute()
+            if result.data:
+                student_id = result.data.get("student_id")
+        except Exception:
+            # If lookup fails, continue without student_id
+            pass
         
         return AuthenticatedUser(
             user_id=user_id,
             email=payload.get("email"),
-            student_id=user_metadata.get("student_id"),
+            student_id=student_id,
             is_admin=app_metadata.get("is_admin", False)
         )
         
