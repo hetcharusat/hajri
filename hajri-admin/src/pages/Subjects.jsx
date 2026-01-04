@@ -1,14 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { EnhancedSelect } from '@/components/ui/enhanced-select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { supabase } from '@/lib/supabase'
 import { useScopeStore } from '@/lib/store'
-import { BookOpen, Plus, Trash2, Download, AlertCircle, Edit2, Shuffle, X } from 'lucide-react'
+import { BookOpen, Plus, Trash2, Download, AlertCircle, Edit2, Shuffle, X, Search, RefreshCw } from 'lucide-react'
+
+const SUBJECT_TYPES = [
+  { value: 'LECTURE', label: 'Lecture', color: 'bg-blue-500/20 text-blue-400' },
+  { value: 'LAB', label: 'Lab', color: 'bg-purple-500/20 text-purple-400' },
+  { value: 'TUTORIAL', label: 'Tutorial', color: 'bg-emerald-500/20 text-emerald-400' }
+]
 
 export default function Subjects() {
   const { semesterId } = useScopeStore()
@@ -16,6 +21,11 @@ export default function Subjects() {
   const [subjects, setSubjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [error, setError] = useState('')
+  
+  // Add form
+  const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -24,11 +34,25 @@ export default function Subjects() {
     type: 'LECTURE',
     is_elective: false
   })
-  const [error, setError] = useState('')
   
   // Edit mode
   const [editingSubject, setEditingSubject] = useState(null)
   const [editFormData, setEditFormData] = useState({})
+
+  // Filter subjects based on search
+  const filteredSubjects = useMemo(() => {
+    if (!searchQuery.trim()) return subjects
+    const q = searchQuery.toLowerCase()
+    return subjects.filter(s => 
+      s.code?.toLowerCase().includes(q) ||
+      s.name?.toLowerCase().includes(q) ||
+      s.abbreviation?.toLowerCase().includes(q)
+    )
+  }, [subjects, searchQuery])
+
+  // Separate regular and elective subjects
+  const regularSubjects = useMemo(() => filteredSubjects.filter(s => !s.is_elective), [filteredSubjects])
+  const electiveSubjects = useMemo(() => filteredSubjects.filter(s => s.is_elective), [filteredSubjects])
 
   useEffect(() => {
     if (!semesterId) {
@@ -42,6 +66,7 @@ export default function Subjects() {
   const fetchData = async (targetSemesterId) => {
     try {
       setLoading(true)
+      setError('')
 
       const { data, error } = await supabase
         .from('subjects')
@@ -54,7 +79,6 @@ export default function Subjects() {
           )
         `)
         .eq('semester_id', targetSemesterId)
-        .order('is_elective', { ascending: true })
         .order('code', { ascending: true })
 
       if (error) throw error
@@ -64,6 +88,10 @@ export default function Subjects() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const resetForm = () => {
+    setFormData({ code: '', name: '', abbreviation: '', credits: 3, type: 'LECTURE', is_elective: false })
   }
 
   const handleAdd = async (e) => {
@@ -79,10 +107,10 @@ export default function Subjects() {
         .from('subjects')
         .insert([{
           code: formData.code.trim().toUpperCase(),
-          name: formData.name.trim(),
+          name: formData.name.trim().toUpperCase(),
           abbreviation: formData.abbreviation.trim().toUpperCase() || null,
           semester_id: semesterId,
-          credits: parseInt(formData.credits),
+          credits: parseInt(formData.credits) || 3,
           type: formData.type,
           is_elective: formData.is_elective
         }])
@@ -90,7 +118,8 @@ export default function Subjects() {
       if (error) throw error
 
       await fetchData(semesterId)
-      setFormData({ code: '', name: '', abbreviation: '', credits: 3, type: 'LECTURE', is_elective: false })
+      resetForm()
+      setShowAddForm(false)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -98,10 +127,11 @@ export default function Subjects() {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this subject? This will remove all related timetable entries and offerings.')) return
+  const handleDelete = async (id, name) => {
+    if (!confirm(`Delete "${name}"? This will remove all related timetable entries.`)) return
 
     try {
+      setError('')
       const { error } = await supabase
         .from('subjects')
         .delete()
@@ -117,11 +147,11 @@ export default function Subjects() {
   const handleEdit = (subject) => {
     setEditingSubject(subject)
     setEditFormData({
-      code: subject.code,
-      name: subject.name,
+      code: subject.code || '',
+      name: subject.name || '',
       abbreviation: subject.abbreviation || '',
-      credits: subject.credits,
-      type: subject.type,
+      credits: subject.credits || 3,
+      type: subject.type || 'LECTURE',
       is_elective: subject.is_elective || false
     })
   }
@@ -137,9 +167,9 @@ export default function Subjects() {
         .from('subjects')
         .update({
           code: editFormData.code.trim().toUpperCase(),
-          name: editFormData.name.trim(),
+          name: editFormData.name.trim().toUpperCase(),
           abbreviation: editFormData.abbreviation?.trim().toUpperCase() || null,
-          credits: parseInt(editFormData.credits),
+          credits: parseInt(editFormData.credits) || 3,
           type: editFormData.type,
           is_elective: editFormData.is_elective
         })
@@ -163,341 +193,346 @@ export default function Subjects() {
   }
 
   const exportToCSV = () => {
-    const headers = ['code', 'name', 'abbreviation', 'branch', 'semester', 'credits', 'type', 'is_elective']
+    const headers = ['code', 'name', 'abbreviation', 'credits', 'type', 'is_elective']
     const rows = subjects.map(s => [
       s.code,
-      s.name,
+      `"${s.name}"`,
       s.abbreviation || '',
-      s.semesters?.branches?.abbreviation || '',
-      s.semesters?.semester_number || '',
       s.credits,
       s.type,
       s.is_elective ? 'Yes' : 'No'
     ])
 
-    const csv = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n')
-
+    const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'subjects.csv'
+    a.download = `subjects_${new Date().toISOString().slice(0,10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
 
-  // Separate regular and elective subjects for display
-  const regularSubjects = subjects.filter(s => !s.is_elective)
-  const electiveSubjects = subjects.filter(s => s.is_elective)
+  const getTypeStyle = (type) => {
+    return SUBJECT_TYPES.find(t => t.value === type)?.color || 'bg-gray-500/20 text-gray-400'
+  }
+
+  // No semester selected
+  if (!semesterId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
+        <BookOpen className="h-16 w-16 text-muted-foreground/30 mb-4" />
+        <h2 className="text-xl font-semibold text-foreground mb-2">No Semester Selected</h2>
+        <p className="text-muted-foreground max-w-md">
+          Select a Semester from the Tree Explorer on the left to manage subjects.
+        </p>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Subjects</h1>
-          <p className="text-muted-foreground">Semester-scoped curriculum (regular &amp; elective subjects)</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Subjects</h1>
+          <p className="text-sm text-muted-foreground">
+            {subjects.length} subjects • {regularSubjects.length} regular • {electiveSubjects.length} elective
+          </p>
         </div>
-        <Button onClick={exportToCSV} variant="outline" disabled={!semesterId || subjects.length === 0}>
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => fetchData(semesterId)}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={exportToCSV} 
+            disabled={subjects.length === 0}
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+          <Button 
+            size="sm"
+            onClick={() => setShowAddForm(true)}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Add Subject
+          </Button>
+        </div>
       </div>
 
-      {!semesterId && (
-        <div className="flex items-start gap-3 rounded-lg border-2 border-border bg-muted/30 p-6">
-          <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-foreground">Semester scope required</p>
-            <p className="text-sm text-muted-foreground">Select a Semester node in the Tree Explorer to manage subjects.</p>
-          </div>
-        </div>
-      )}
-
+      {/* Error Alert */}
       {error && (
-        <div className="flex items-start gap-3 rounded-lg border-2 border-destructive bg-destructive/10 p-4">
-          <AlertCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-destructive">Error</p>
-            <p className="text-sm text-foreground">{error}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => setError('')}>
-            <X className="h-4 w-4" />
+        <div className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+          <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+          <div className="flex-1 text-sm text-destructive">{error}</div>
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setError('')}>
+            <X className="h-3 w-3" />
           </Button>
         </div>
       )}
 
-      <div className="flex flex-col gap-6">
-        {/* Add Subject Form */}
-        <Card className="border-2">
-          <CardHeader>
-            <CardTitle>Add New Subject</CardTitle>
-            <CardDescription>Enter subject details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAdd} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="code">Subject Code *</Label>
-                  <Input
-                    id="code"
-                    placeholder="CS101"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    required
-                    disabled={!semesterId}
-                  />
-                </div>
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search subjects by code, name, or abbreviation..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="name">Subject Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Introduction to Programming"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                    disabled={!semesterId}
-                  />
-                </div>
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      ) : (
+        <>
+          {/* Subjects Grid */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Regular Subjects */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Regular Subjects
+                  <span className="ml-auto text-sm font-normal text-muted-foreground">
+                    {regularSubjects.length}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {regularSubjects.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No regular subjects found
+                  </div>
+                ) : (
+                  <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
+                    {regularSubjects.map((subject) => (
+                      <SubjectRow
+                        key={subject.id}
+                        subject={subject}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        getTypeStyle={getTypeStyle}
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                <div className="space-y-2">
-                  <Label htmlFor="abbreviation">Abbreviation (OCR)</Label>
-                  <Input
-                    id="abbreviation"
-                    placeholder="ITP"
-                    value={formData.abbreviation}
-                    onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value })}
-                    disabled={!semesterId}
-                    className="font-mono uppercase"
-                  />
-                  <p className="text-xs text-muted-foreground">Short name for OCR matching</p>
-                </div>
+            {/* Elective Subjects */}
+            <Card className="border-orange-500/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shuffle className="h-4 w-4 text-orange-500" />
+                  Elective Subjects
+                  <span className="ml-auto text-sm font-normal text-muted-foreground">
+                    {electiveSubjects.length}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {electiveSubjects.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No elective subjects found
+                  </div>
+                ) : (
+                  <div className="space-y-1 max-h-[60vh] overflow-y-auto pr-1">
+                    {electiveSubjects.map((subject) => (
+                      <SubjectRow
+                        key={subject.id}
+                        subject={subject}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        getTypeStyle={getTypeStyle}
+                        isElective
+                      />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+
+      {/* Add Subject Dialog */}
+      <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add New Subject</DialogTitle>
+            <DialogDescription>Enter subject details for this semester</DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleAdd} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Code *</Label>
+                <Input
+                  placeholder="CEUC101"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                  className="font-mono"
+                  required
+                />
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Abbreviation (OCR)</Label>
+                <Input
+                  placeholder="CCP"
+                  value={formData.abbreviation}
+                  onChange={(e) => setFormData({ ...formData, abbreviation: e.target.value.toUpperCase() })}
+                  className="font-mono"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1.5">
+              <Label className="text-xs">Name *</Label>
+              <Input
+                placeholder="COMPUTER CONCEPTS AND PROGRAMMING"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                required
+              />
+            </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="credits">Credits</Label>
-                  <Input
-                    id="credits"
-                    type="number"
-                    min="1"
-                    max="6"
-                    value={formData.credits}
-                    onChange={(e) => setFormData({ ...formData, credits: e.target.value })}
-                    disabled={!semesterId}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type</Label>
-                  <EnhancedSelect
-                    value={{ value: formData.type, label: formData.type === 'LECTURE' ? 'Lecture' : formData.type === 'LAB' ? 'Lab' : 'Tutorial' }}
-                    onChange={(option) => setFormData({ ...formData, type: option?.value || 'LECTURE' })}
-                    options={[
-                      { value: 'LECTURE', label: 'Lecture' },
-                      { value: 'LAB', label: 'Lab' },
-                      { value: 'TUTORIAL', label: 'Tutorial' }
-                    ]}
-                    placeholder="Select type"
-                    isDisabled={!semesterId}
-                  />
-                </div>
-
-                {/* Elective Toggle */}
-                <div className="col-span-2 flex items-center gap-3 p-3 rounded-lg border-2 border-dashed border-border bg-muted/30">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Credits</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={formData.credits}
+                  onChange={(e) => setFormData({ ...formData, credits: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Type</Label>
+                <EnhancedSelect
+                  value={SUBJECT_TYPES.find(t => t.value === formData.type)}
+                  onChange={(option) => setFormData({ ...formData, type: option?.value || 'LECTURE' })}
+                  options={SUBJECT_TYPES}
+                  placeholder="Type"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Elective?</Label>
+                <div className="flex items-center h-9 px-3 border rounded-md bg-muted/30">
                   <input
                     type="checkbox"
-                    id="is_elective"
+                    id="add_is_elective"
                     checked={formData.is_elective}
                     onChange={(e) => setFormData({ ...formData, is_elective: e.target.checked })}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    disabled={!semesterId}
+                    className="h-4 w-4 rounded"
                   />
-                  <div className="flex-1">
-                    <Label htmlFor="is_elective" className="cursor-pointer font-medium">
-                      <Shuffle className="inline h-4 w-4 mr-1 text-orange-500" />
-                      Elective Subject
-                    </Label>
-                    <p className="text-xs text-muted-foreground">Can share time slot with other electives</p>
-                  </div>
+                  <Label htmlFor="add_is_elective" className="ml-2 text-xs cursor-pointer">
+                    Yes
+                  </Label>
                 </div>
               </div>
+            </div>
 
-              <Button type="submit" className="w-full" disabled={saving || !semesterId}>
-                {saving ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Adding...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Subject
-                  </>
-                )}
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => { resetForm(); setShowAddForm(false); }}>
+                Cancel
               </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Subjects Lists */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Regular Subjects */}
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BookOpen className="mr-2 h-5 w-5" />
-                Regular Subjects ({regularSubjects.length})
-              </CardTitle>
-              <CardDescription>Core curriculum subjects</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-12">
-                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                  <p className="mt-4 text-sm text-muted-foreground">Loading subjects...</p>
-                </div>
-              ) : !semesterId ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Select a Semester to view subjects.
-                </div>
-              ) : regularSubjects.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <BookOpen className="mx-auto h-10 w-10 opacity-50 mb-3" />
-                  <p>No regular subjects yet</p>
-                </div>
-              ) : (
-                <SubjectsTable 
-                  subjects={regularSubjects} 
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Elective Subjects */}
-          <Card className="border-2 border-orange-500/30">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Shuffle className="mr-2 h-5 w-5 text-orange-500" />
-                Elective Subjects ({electiveSubjects.length})
-              </CardTitle>
-              <CardDescription>Subjects that can share time slots</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-12">
-                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-              ) : !semesterId ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Select a Semester to view subjects.
-                </div>
-              ) : electiveSubjects.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Shuffle className="mx-auto h-10 w-10 opacity-50 mb-3" />
-                  <p>No elective subjects yet</p>
-                  <p className="text-xs mt-1">Mark a subject as elective when adding</p>
-                </div>
-              ) : (
-                <SubjectsTable 
-                  subjects={electiveSubjects}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  isElective
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Adding...' : 'Add Subject'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Subject Dialog */}
       <Dialog open={!!editingSubject} onOpenChange={(open) => !open && handleCancelEdit()}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Subject</DialogTitle>
             <DialogDescription>Update subject details</DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Code</Label>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Code</Label>
                 <Input
                   value={editFormData.code || ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, code: e.target.value })}
+                  onChange={(e) => setEditFormData({ ...editFormData, code: e.target.value.toUpperCase() })}
+                  className="font-mono"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Abbreviation</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Abbreviation (OCR)</Label>
                 <Input
                   value={editFormData.abbreviation || ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, abbreviation: e.target.value })}
-                  placeholder="OCR short name"
-                  className="font-mono uppercase"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Credits</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="6"
-                  value={editFormData.credits || 3}
-                  onChange={(e) => setEditFormData({ ...editFormData, credits: e.target.value })}
+                  onChange={(e) => setEditFormData({ ...editFormData, abbreviation: e.target.value.toUpperCase() })}
+                  className="font-mono"
+                  placeholder="Short name for OCR"
                 />
               </div>
             </div>
             
-            <div className="space-y-2">
-              <Label>Name</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Name</Label>
               <Input
                 value={editFormData.name || ''}
                 onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
               />
             </div>
-            
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <EnhancedSelect
-                value={{ 
-                  value: editFormData.type, 
-                  label: editFormData.type === 'LECTURE' ? 'Lecture' : editFormData.type === 'LAB' ? 'Lab' : 'Tutorial' 
-                }}
-                onChange={(option) => setEditFormData({ ...editFormData, type: option?.value || 'LECTURE' })}
-                options={[
-                  { value: 'LECTURE', label: 'Lecture' },
-                  { value: 'LAB', label: 'Lab' },
-                  { value: 'TUTORIAL', label: 'Tutorial' }
-                ]}
-              />
-            </div>
 
-            {/* Elective Toggle in Edit */}
-            <div className="flex items-center gap-3 p-3 rounded-lg border-2 border-dashed border-border bg-muted/30">
-              <input
-                type="checkbox"
-                id="edit_is_elective"
-                checked={editFormData.is_elective || false}
-                onChange={(e) => setEditFormData({ ...editFormData, is_elective: e.target.checked })}
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <div className="flex-1">
-                <Label htmlFor="edit_is_elective" className="cursor-pointer font-medium">
-                  <Shuffle className="inline h-4 w-4 mr-1 text-orange-500" />
-                  Elective Subject
-                </Label>
-                <p className="text-xs text-muted-foreground">Can share time slot with other electives</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Credits</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={editFormData.credits || 3}
+                  onChange={(e) => setEditFormData({ ...editFormData, credits: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Type</Label>
+                <EnhancedSelect
+                  value={SUBJECT_TYPES.find(t => t.value === editFormData.type)}
+                  onChange={(option) => setEditFormData({ ...editFormData, type: option?.value || 'LECTURE' })}
+                  options={SUBJECT_TYPES}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Elective?</Label>
+                <div className="flex items-center h-9 px-3 border rounded-md bg-muted/30">
+                  <input
+                    type="checkbox"
+                    id="edit_is_elective"
+                    checked={editFormData.is_elective || false}
+                    onChange={(e) => setEditFormData({ ...editFormData, is_elective: e.target.checked })}
+                    className="h-4 w-4 rounded"
+                  />
+                  <Label htmlFor="edit_is_elective" className="ml-2 text-xs cursor-pointer">
+                    Yes
+                  </Label>
+                </div>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button variant="outline" onClick={handleCancelEdit}>Cancel</Button>
             <Button onClick={handleSaveEdit} disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}
@@ -509,72 +544,57 @@ export default function Subjects() {
   )
 }
 
-// Reusable table component
-function SubjectsTable({ subjects, onEdit, onDelete, isElective = false }) {
+// Individual subject row component
+function SubjectRow({ subject, onEdit, onDelete, getTypeStyle, isElective = false }) {
   return (
-    <div className="rounded-md border-2 border-border max-h-[400px] overflow-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Code</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Abbr</TableHead>
-            <TableHead>Credits</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {subjects.map((subject) => (
-            <TableRow key={subject.id}>
-              <TableCell className="font-medium font-mono">
-                {isElective && <Shuffle className="inline h-3 w-3 mr-1 text-orange-500" />}
-                {subject.code}
-              </TableCell>
-              <TableCell>{subject.name}</TableCell>
-              <TableCell>
-                {subject.abbreviation ? (
-                  <span className="font-mono text-xs px-2 py-0.5 rounded bg-accent text-accent-foreground">
-                    {subject.abbreviation}
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground italic">—</span>
-                )}
-              </TableCell>
-              <TableCell>{subject.credits}</TableCell>
-              <TableCell>
-                <span className={`text-xs px-2 py-1 rounded ${
-                  subject.type === 'LAB' ? 'bg-purple-500/20 text-purple-400' :
-                  subject.type === 'TUTORIAL' ? 'bg-emerald-500/20 text-emerald-400' :
-                  'bg-blue-500/20 text-blue-400'
-                }`}>
-                  {subject.type}
-                </span>
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEdit(subject)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(subject.id)}
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="group flex items-center gap-2 p-2 rounded-md hover:bg-muted/50 transition-colors">
+      {/* Code */}
+      <div className="w-24 shrink-0">
+        <span className="font-mono text-xs font-medium">
+          {isElective && <Shuffle className="inline h-3 w-3 mr-1 text-orange-500" />}
+          {subject.code}
+        </span>
+      </div>
+      
+      {/* Name + Abbr */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm truncate">{subject.name}</div>
+        {subject.abbreviation && (
+          <span className="inline-block mt-0.5 font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+            {subject.abbreviation}
+          </span>
+        )}
+      </div>
+      
+      {/* Type Badge */}
+      <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${getTypeStyle(subject.type)}`}>
+        {subject.type}
+      </span>
+      
+      {/* Credits */}
+      <span className="text-xs text-muted-foreground w-8 text-center shrink-0">
+        {subject.credits}cr
+      </span>
+      
+      {/* Actions */}
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onEdit(subject)}
+          className="h-7 w-7 p-0"
+        >
+          <Edit2 className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(subject.id, subject.name)}
+          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   )
 }
